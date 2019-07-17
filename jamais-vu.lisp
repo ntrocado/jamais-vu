@@ -286,8 +286,7 @@
   (with-accessors ((playing-p playing-p) (player-nodes player-nodes))
       looper
     (when playing-p
-      (mapc (lambda (n) (ctrl n :gate 0)) player-nodes))
-    (setf player-nodes nil)))
+      (mapc (lambda (n) (ctrl n :gate 0)) player-nodes))))
 
 ;;; Clear buffer
 
