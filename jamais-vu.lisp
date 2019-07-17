@@ -116,7 +116,8 @@
 				   '(:lin :hold :lin)) :act :free))
 	(cutoff (env-gen.kr (cutoff 0.1) :gate gate :act :free)))
     (send-trig.kr (done.kr envelope) +play-done+)
-    (out.ar '(0 1) (pan2.ar (* sound envelope cutoff amp)))))
+    (send-trig.kr (done.kr cutoff) +play-done+)
+    (out.ar out (pan2.ar (* sound envelope cutoff amp)))))
 
 (defsynth poeira ((out 0)
 		  bufn
