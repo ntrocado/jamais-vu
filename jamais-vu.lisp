@@ -49,6 +49,9 @@
    (play-repetitions
     :accessor play-repetitions
     :initform 1)
+   (looping-p
+    :accessor looping-p
+    :initform nil)
    (inter-onset-timings
     :accessor inter-onset-timings
     :initform '())
@@ -194,6 +197,7 @@
 	       absolute-onset-timings (inter-onset->absolute
 				       (reverse inter-onset-timings))
 	       inter-onset-timings '()
+	       dur value
 	       recording-p nil))))
 
     ;; Onset detected
@@ -246,7 +250,7 @@
 			 ))
   (with-accessors ((buffer buffer) (looper-dur dur))
       looper
-    (if (plusp n)
+    (if (or (plusp n) (looping-p looper))
 	(let ((dur (min dur (buffer-dur buffer))))
 	  (setf (playing-p looper) t)
 	  (at time (push (synth 'play-buf :bufn (bufnum buffer)
@@ -264,7 +268,8 @@
 		      :start-pos start-pos)))
 	;; no more repetitions
 	(progn
-	  (setf (playing-p looper) nil)
+	  (setf (playing-p looper) nil
+		(looping-p looper) nil)
 	  (when *window*
 	    (signal! *window* (play-finished string) "PLAY"))))))
 
@@ -283,13 +288,16 @@
 
 ;;; TODO
 (defun start-looping (&key (looper (default-looper)))
-  ())
+  (setf (looping-p looper) t)
+  (start-playing :looper looper))
 
 (defun stop-playing (&key (looper (default-looper)))
   (with-accessors ((playing-p playing-p) (player-nodes player-nodes))
       looper
     (when playing-p
-      (mapc (lambda (n) (ctrl n :gate 0)) player-nodes))))
+      (mapc (lambda (n) (ctrl n :gate 0)) player-nodes))
+    (setf (playing-p looper) nil
+	  (looping-p looper) nil)))
 
 ;;; Clear buffer
 
@@ -339,7 +347,6 @@
     (declare (ignore file))
     (make-wave-file path :frames frames)
     (buffer-read path :bufnum (bufnum buffer))))
-
 
 (defun buf-random-sign-delta (&key (looper (default-looper)) (prob 9))
   (let* ((old-buffer (buffer looper))
