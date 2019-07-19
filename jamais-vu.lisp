@@ -8,7 +8,7 @@
 (defparameter *default-number-of-sub-bufs* 8)
 (defparameter *default-input* 1)
 
-(defvar *external-osc-port* 8002)
+(defvar *external-osc-port* 8000)
 (defvar *osc-on* t)
 
 (defconstant +rec-done+ 0)
@@ -186,8 +186,10 @@
 			(inter-onset-timings inter-onset-timings)
 			(recording-p recording-p))
 	   looper
-	 (setf (frames buffer) (truncate (* (max value dur)
-					    *server-sample-rate*))
+	 (setf (frames buffer) (- (truncate (* (max value dur)
+					       *server-sample-rate*))
+				  32 ; TODO check why; block size?
+				  )
 	       loop-start (* (mod value dur) *server-sample-rate*)
 	       absolute-onset-timings (inter-onset->absolute
 				       (reverse inter-onset-timings))
@@ -251,7 +253,7 @@
 					  :dur dur
 					  :start-pos start-pos)
 			 (player-nodes looper)))
-	  (let ((next-time (+ time dur)))
+	  (let ((next-time (- (+ time dur) offset)))
 	    (callback next-time
 		      #'start-playing
 		      :looper looper
@@ -280,7 +282,7 @@
      :dur dur)))
 
 ;;; TODO
-(defun start-looping ()
+(defun start-looping (&key (looper (default-looper)))
   ())
 
 (defun stop-playing (&key (looper (default-looper)))
@@ -299,6 +301,58 @@
 (defun halve-buffer (&key (looper (default-looper)))
   (with-accessors ((buffer buffer)) looper
     (setf (frames buffer) (/ (frames buffer) 2))))
+
+
+;;; Random sign delta
+
+(defun random-sign (x prob)
+  (if (> prob (random 1.0))
+    (if (zerop (1- (random 2)))
+	(abs x)
+	(- (abs x)))
+    x))
+
+(defun random-sign-delta (seq prob)
+  (typecase seq
+    (list 
+     (loop :for (a b) :on seq
+	   :while b
+	   :collect (random-sign (- b a) prob)))
+    (vector
+     (loop :with results := (make-array (1- (length seq)))
+	   :for i :below (1- (length seq))
+	   :do (setf (aref results i) (random-sign (- (aref seq (1+ i))
+						      (aref seq i))
+						   prob))
+	   :finally (return results)))))
+
+
+(defun make-wave-file (path &key frames (channels 1) (sample-rate 44100))
+  (sf:with-open-sndfile (file path :direction :output :chanls channels :sr sample-rate)
+    (sf:write-frames-float frames file)))
+
+(defun buffer-load-from-list (buffer frames)
+  (uiop:with-temporary-file (:stream file
+			     :pathname path
+			     :type "wav"
+			     :element-type '(unsigned-byte 32))
+    (declare (ignore file))
+    (make-wave-file path :frames frames)
+    (buffer-read path :bufnum (bufnum buffer))))
+
+
+(defun buf-random-sign-delta (&key (looper (default-looper)) (prob 9))
+  (let* ((old-buffer (buffer looper))
+	 (deltas (push 0 (random-sign-delta (buffer-load-to-list old-buffer)
+					    prob))))
+    (buffer-load-from-list (buffer looper) (loop :for d :in deltas
+						 :for v := (buffer-get old-buffer 0)
+						   :then (let ((sum (+ v d)))
+							   (if (< -1.0 sum 1.0)
+							       sum
+							       (- v d)))
+						 :collect v))))
+
 
 ;;; T-Grains
 
@@ -529,29 +583,43 @@
     (toggle-poeira values)) ; 5
   "A vector of function pairs for note on and note off OSC events.")
 
-(defun external-osc-listener (port)
-  "Listen for OSC messages on PORT and execute the respective commands."
-  (let ((s (usocket:socket-connect nil nil
-				   :local-port port
-				   :local-host #(127 0 0 1)
-				   :protocol :datagram
-				   :element-type '(unsigned-byte 8)))
-	(buffer (make-sequence '(vector (unsigned-byte 8)) 1024)))
-    (unwind-protect
-	 (loop :do (usocket:socket-receive s buffer (length buffer))
-		   (destructuring-bind (msg val) (osc:decode-bundle buffer)
+(defun external-osc-handler (buffer)
+  (declare (type (simple-array (unsigned-byte 8) *) buffer))
+  (destructuring-bind (msg val) (osc:decode-bundle buffer)
 		     (let ((preset (aref *osc-controller-presets* (1- val))))
 		       (funcall (cond
 				  ((equal msg "/on") (first preset))
-				  ((equal msg "/off") (second preset))))))
-	       :unless *osc-on* :do (return))
-      (when s (usocket:socket-close s)))))
+				  ((equal msg "/off") (second preset)))))))
+
+(defparameter *external-osc-listener-thread*
+  (usocket:socket-server "127.0.0.1" *external-osc-port* #'external-osc-handler ()
+		 :in-new-thread t
+		 :protocol :datagram))
+
+;; (defun external-osc-listener (port)
+;;   "Listen for OSC messages on PORT and execute the respective commands."
+;;   (let ((s (usocket:socket-connect nil nil
+;; 				   :local-port port
+;; 				   :local-host #(127 0 0 1)
+;; 				   :protocol :datagram
+;; 				   :element-type '(unsigned-byte 8)))
+;; 	(buffer (make-sequence '(vector (unsigned-byte 8)) 1024)))
+;;     (unwind-protect
+;; 	 (loop :do (usocket:socket-receive s buffer (length buffer))
+;; 		   (destructuring-bind (msg val) (osc:decode-bundle buffer)
+;; 		     (let ((preset (aref *osc-controller-presets* (1- val))))
+;; 		       (funcall (cond
+;; 				  ((equal msg "/on") (first preset))
+;; 				  ((equal msg "/off") (second preset))))))
+;; 	       :unless *osc-on* :do (return))
+;;       (when s (usocket:socket-close s)))))
 
 (defun start-external-osc-listener (&optional (port *external-osc-port*))
   (setf *osc-on* t)
-  (bt:make-thread
-   (lambda () (external-osc-listener port))
-   :name (format nil "External OSC listener on port ~a" port)))
+  ;; (bt:make-thread
+  ;;  (lambda () (external-osc-listener port))
+  ;;  :name (format nil "External OSC listener on port ~a" port))
+  (external-osc-listener port))
 
 (unless *osc-on* (start-external-osc-listener))
 

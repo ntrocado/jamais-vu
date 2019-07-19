@@ -10,6 +10,8 @@
 	       #:qtcore
 	       #:qtgui
 	       #:alexandria
-	       #:cl-collider)
+	       #:cl-collider
+	       #:usocket-server
+	       #:cl-sndfile)
   :components ((:file "package")
                (:file "jamais-vu")))
