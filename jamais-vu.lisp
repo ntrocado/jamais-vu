@@ -348,17 +348,19 @@
     (make-wave-file path :frames frames)
     (buffer-read path :bufnum (bufnum buffer))))
 
-(defun buf-random-sign-delta (&key (looper (default-looper)) (prob 9))
+(defun buf-random-sign-delta (&key (looper (default-looper)) (prob 7))
   (let* ((old-buffer (buffer looper))
-	 (deltas (push 0 (random-sign-delta (buffer-load-to-list old-buffer)
-					    prob))))
-    (buffer-load-from-list (buffer looper) (loop :for d :in deltas
-						 :for v := (buffer-get old-buffer 0)
-						   :then (let ((sum (+ v d)))
-							   (if (< -1.0 sum 1.0)
-							       sum
-							       (- v d)))
-						 :collect v))))
+	 (deltas (random-sign-delta (buffer-load-to-list old-buffer)
+				    prob)))
+    (buffer-load-from-list (buffer looper)
+			   (loop :for d :in deltas
+				 :for v := (buffer-get old-buffer 0)
+				   :then (let ((sum (+ v d)))
+					   (if (< -1.0 sum 1.0)
+					       sum
+					       (- v d)))
+				 :collect v :into results
+				 :finally (return (push 0.0 results))))))
 
 
 ;;; T-Grains
