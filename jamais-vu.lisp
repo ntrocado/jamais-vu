@@ -6,9 +6,11 @@
 (defparameter *server-sample-rate* 44100)
 (defparameter *default-buffer-duration* 8.0)
 (defparameter *default-number-of-sub-bufs* 8)
-(defparameter *default-input* 1)
+(defparameter *default-input* 0)
 
 (defvar *external-osc-port* 8000)
+(defvar *osc-thread*)
+(defvar *osc-socket*)
 (defvar *osc-on* t)
 
 (defconstant +rec-done+ 0)
@@ -275,7 +277,7 @@
 
 (defun start-playing-random-start (&key
 				     (looper (default-looper))
-				     (dur (dur looper)))
+				     (dur 0.5))
   (with-accessors ((absolute-onset-timings absolute-onset-timings)
 		   (buffer buffer))
       looper
@@ -595,15 +597,20 @@
 (defun external-osc-handler (buffer)
   (declare (type (simple-array (unsigned-byte 8) *) buffer))
   (destructuring-bind (msg val) (osc:decode-bundle buffer)
-		     (let ((preset (aref *osc-controller-presets* (1- val))))
-		       (funcall (cond
-				  ((equal msg "/on") (first preset))
-				  ((equal msg "/off") (second preset)))))))
+    (let ((preset (aref *osc-controller-presets* (1- val))))
+      (funcall (cond
+		 ((equal msg "/on") (first preset))
+		 ((equal msg "/off") (second preset))))
+      buffer)))
 
-(defparameter *external-osc-listener-thread*
-  (usocket:socket-server "127.0.0.1" *external-osc-port* #'external-osc-handler ()
+;;; TODO: condition handler para evitar que erros mandem a thread abaixo
+
+(multiple-value-bind (thread osc-socket)
+    (usocket:socket-server "127.0.0.1" *external-osc-port* #'external-osc-handler ()
 		 :in-new-thread t
-		 :protocol :datagram))
+		 :protocol :datagram)
+  (setf *osc-thread* thread
+	*osc-socket* osc-socket))
 
 ;; (defun external-osc-listener (port)
 ;;   "Listen for OSC messages on PORT and execute the respective commands."
@@ -623,14 +630,14 @@
 ;; 	       :unless *osc-on* :do (return))
 ;;       (when s (usocket:socket-close s)))))
 
-(defun start-external-osc-listener (&optional (port *external-osc-port*))
-  (setf *osc-on* t)
-  ;; (bt:make-thread
-  ;;  (lambda () (external-osc-listener port))
-  ;;  :name (format nil "External OSC listener on port ~a" port))
-  (external-osc-listener port))
+;; (defun start-external-osc-listener (&optional (port *external-osc-port*))
+;;   (setf *osc-on* t)
+;;   ;; (bt:make-thread
+;;   ;;  (lambda () (external-osc-listener port))
+;;   ;;  :name (format nil "External OSC listener on port ~a" port))
+;;   (external-osc-listener port))
 
-(unless *osc-on* (start-external-osc-listener))
+;; (unless *osc-on* (start-external-osc-listener))
 
-(defun stop-external-osc-listener ()
-  (setf *osc-on* nil))
+;; (defun stop-external-osc-listener ()
+;;   (setf *osc-on* nil))
