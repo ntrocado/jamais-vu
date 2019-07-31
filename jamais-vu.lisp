@@ -3,77 +3,101 @@
 (in-package #:jamais-vu)
 (in-readtable :qtools)
 
-(defparameter *server-sample-rate* 44100)
-(defparameter *default-buffer-duration* 8.0)
-(defparameter *default-number-of-sub-bufs* 8)
-(defparameter *default-input* 0)
+(defparameter *server-sample-rate* 44100
+  "The sample rate of the audio server.")
+(defparameter *default-buffer-duration* 8.0
+  "Default buffer duration in seconds.")
+(defparameter *default-number-of-sub-bufs* 8
+  "Default number of sub-buffers.")
+(defparameter *default-input* 0
+  "Default recording input in the audio interface.")
 
-(defvar *external-osc-port* 8000)
-(defvar *osc-thread*)
-(defvar *osc-socket*)
-(defvar *osc-on* t)
-
-(defconstant +rec-done+ 0)
-(defconstant +onset+ 1)
-(defconstant +play-done+ 2)
+(defvar *external-osc-port* 8000
+  "OSC port of the external controller device.")
+(defvar *osc-thread*
+  "To be bind to the listener thread for the external OSC controller device.")
+(defvar *osc-socket*
+  "To be bind to the socket for the external OSC controller device.")
+(defvar *osc-on* t
+  "Setting to nil signals that the listener thread should end and the socket for the external OSC controller device should be closed.")
 
 (defun server-start ()
+  "Defines a SuperCollider server and boots it."
   (setf *s* (make-external-server "localhost" :port 4445))
   (server-boot *s*))
 
+;;; Boot the server if it's not running already
 (unless (and *s* (sc::boot-p *s*)) (server-start))
 
-(defparameter *looper-last-id* 0)
+(defparameter *looper-last-id* 0
+  "Last id number that was attributed to a looper.")
 
 (defclass looper ()
   ((id
-    :initarg :id
     :accessor id
-    :initform (incf *looper-last-id*))
+    :initarg :id
+    :initform (incf *looper-last-id*)
+    :documentation "Each looper gets an exclusive numerical identifier.")
    (name
-    :initarg :name
     :accessor name
-    :initform "Unnamed looper")
+    :initarg :name
+    :initform "Unnamed looper"
+    :documentation "The looper's name.")
    (dur
-    :initarg :dur
     :accessor dur
-    :initform *default-buffer-duration*)
+    :initarg :dur
+    :initform *default-buffer-duration*
+    :documentation "Duration in seconds.")
    (number-of-sub-bufs
-    :initarg :number-of-sub-bufs
     :accessor number-of-sub-bufs
-    :initform *default-number-of-sub-bufs*)
+    :initarg :number-of-sub-bufs
+    :initform *default-number-of-sub-bufs*
+    :documentation "Number of sub-buffers to divide the main buffer.")
    (recording-p
     :accessor recording-p
-    :initform nil)
+    :initform nil
+    :documentation "Is the looper currently recording?")
    (playing-p
     :accessor playing-p
-    :initform nil)
-   (play-repetitions
-    :accessor play-repetitions
-    :initform 1)
+    :initform nil
+    :documentation "Is the looper currently playing?")
    (looping-p
     :accessor looping-p
-    :initform nil)
+    :initform nil
+    :documentation "Is the looper currently looping?")
+   (play-repetitions
+    :accessor play-repetitions
+    :initform 1
+    :documentation "How many times will playback repeat.")
    (inter-onset-timings
     :accessor inter-onset-timings
-    :initform '())
+    :initform '()
+    :documentation "A list of the time in seconds between each onset, detected while recording.")
    (absolute-onset-timings
     :accessor absolute-onset-timings
-    :initform '())
+    :initform '()
+    :documentation "A list of the time in seconds for each onset.")
    (loop-start
     :accessor loop-start
-    :initform 0)
+    :initform 0
+    :documentation "A time point in seconds where the loop starts.")
    (recorder-node
-    :accessor recorder-node)
+    :accessor recorder-node
+    :documentation "The node of the active recorder synth.")
    (player-nodes
     :accessor player-nodes
-    :initform nil)
+    :initform nil
+    :documentation "A list of the nodes for the active player synths.")
    (buffer
-    :accessor buffer)
+    :accessor buffer
+    :documentation "A buffer object, representing audio in the server.")
    (sub-bufs
-    :accessor sub-bufs)))
+    :accessor sub-bufs
+    :documentation "A list of buffers, resulting from the partitioning of the main buffer."))
+  :documentation "A self-contained abstraction for the recording and playing of an audio sample, stored in the server. Despite the name, it may actually loop or not.")
 
 (defmethod initialize-instance :after ((new-looper looper) &key)
+  "Allocate the necessary audio buffers in the server."
   (with-accessors ((buffer-dur dur) (sub-bufs-n number-of-sub-bufs))
       new-looper
     (setf (buffer new-looper) (buffer-alloc (* *server-sample-rate*
@@ -87,16 +111,19 @@
 							 :chanls 1)))))
 
 (defun init-loopers ()
+  "Return a list which contains only the default looper."
   (list (make-instance 'looper :name "Default")))
 
 (defparameter *loopers* (init-loopers)
   "Global list of active loopers.")
 
-(defun default-looper ()
-    (find-looper-by-name "Default"))
-
 (defun find-looper-by-name (name &optional (loopers *loopers*))
+  "Return the looper called NAME."
   (find name loopers :key #'name :test 'string-equal))
+
+(defun default-looper ()
+  "Return the default looper."
+    (find-looper-by-name "Default"))
 
 
 ;;; Synth definitions
@@ -160,7 +187,20 @@
     (out.ar '(0 1) output)))
 
 
+;;; Global volume
+
+(proxy :volume
+       (with-controls ((amp 1))
+	 (pan2.ar (in.ar 2) 0.0 amp))
+       :pos :tail)
+
+
 ;;; OSC message responder
+
+;;; Constants for the message id sent by the audio server on trigger events
+(defconstant +rec-done+ 0)
+(defconstant +onset+ 1)
+(defconstant +play-done+ 2)
 
 (defun inter-onset->absolute (iot)
   (loop :for v :in iot
@@ -182,7 +222,7 @@
 (defun osc-responder (node id value &optional (qobject nil))
   (case id
     ;; Recording stopped
-    (#.+rec-done+
+    (+rec-done+
      (when qobject (signal! qobject (rec-stop float) value))
      (format t "~&Rec stop. Dur: ~a~%" value)
      (let ((looper (find-recording-looper-by-node-id node)))
@@ -203,13 +243,13 @@
 	       recording-p nil))))
 
     ;; Onset detected
-    (#.+onset+
+    (+onset+
      (let ((looper (find-recording-looper-by-node-id node)))
        (push value (inter-onset-timings looper))
        (format t "~&Onset: ~a~%" value)))
 
     ;; Playing stopped
-    (#.+play-done+
+    (+play-done+
      (let* ((looper (find-playing-looper-by-node-id node))
 	    (nodes (player-nodes looper)))
        (setf (player-nodes looper) (remove (find node nodes :key #'sc::id)
@@ -278,6 +318,7 @@
 (defun start-playing-random-start (&key
 				     (looper (default-looper))
 				     (dur 0.5))
+  "Starts playback on LOOPER for DUR seconds, from a random starting point."
   (with-accessors ((absolute-onset-timings absolute-onset-timings)
 		   (buffer buffer))
       looper
@@ -315,6 +356,7 @@
 
 ;;; Random sign delta
 
+;; TODO it's better to just change the sign when random > prob. Compare results.
 (defun random-sign (x prob)
   (if (> prob (random 1.0))
     (if (zerop (1- (random 2)))
@@ -350,7 +392,8 @@
     (make-wave-file path :frames frames)
     (buffer-read path :bufnum (bufnum buffer))))
 
-(defun buf-random-sign-delta (&key (looper (default-looper)) (prob 7))
+(defun buf-random-sign-delta (&key (looper (default-looper)) (prob 0.7))
+  "Destructively transforms the audio buffer in LOOPER, so that each pair of frames is replaced by the value of their difference. Furthermore, this number can be randomly inverted, with probability PROB (between 0 and 1)."
   (let* ((old-buffer (buffer looper))
 	 (deltas (random-sign-delta (buffer-load-to-list old-buffer)
 				    prob)))
@@ -378,7 +421,7 @@
 		  (pos (+ (mouse-x.kr 0 (buf-dur.kr buffer))
 			  (t-rand.kr 0 0.01 clk)))
 		  (pan (white-noise.kr 0.6)))
-	     (tgrains.ar 2 clk buffer 1 pos dur pan 0.1))))
+	     (tgrains.ar 2 clk buffer 1 pos dur pan 0.5))))
   (setf *t-grains-on* t))
 
 (defun stop-t-grains ()
@@ -389,6 +432,7 @@
   (if *t-grains-on*
       (stop-t-grains)
       (t-grains :looper looper)))
+
 
 ;;; Poeira
 
@@ -409,6 +453,7 @@
   (if *poeira-node*
       (stop-poeira)
       (start-poeira :looper looper)))
+
 
 ;;; Sub-buffers
 
@@ -451,6 +496,8 @@
 ;; 		  :order (rest order) :time next-time :offset offset)))))
 
 ;;; GUI
+
+;;; TODO Put GUI code in a new file.
 
 (defvar *window* nil)
 
@@ -584,6 +631,7 @@
   (add-reply-responder "/tr" #'osc-responder)
   (setf *window* nil))
 
+
 ;;; OSC interface
 
 (defparameter *osc-controller-presets*
@@ -591,17 +639,24 @@
     (start-playing stop-playing) ; 2
     (start-playing-random-start stop-playing) ; 3
     (toggle-t-grains values) ; 4
-    (toggle-poeira values)) ; 5
+    (toggle-poeira values) ; 5
+    (start-looping values) ; 6
+    (stop-looping values) ; 7
+    (buf-random-sign-delta values)) ; 8  
   "A vector of function pairs for note on and note off OSC events.")
 
 (defun external-osc-handler (buffer)
   (declare (type (simple-array (unsigned-byte 8) *) buffer))
-  (destructuring-bind (msg val) (osc:decode-bundle buffer)
-    (let ((preset (aref *osc-controller-presets* (1- val))))
-      (funcall (cond
-		 ((equal msg "/on") (first preset))
-		 ((equal msg "/off") (second preset))))
-      buffer)))
+  (ignore-errors 
+   (destructuring-bind (msg val) (osc:decode-bundle buffer)
+     (print msg)
+     (if (equal msg "/volume")
+	 (ctrl :volume (/ val 127))
+	 (let ((preset (aref *osc-controller-presets* (1- val))))
+	   (funcall (cond
+		      ((equal msg "/on") (first preset))
+		      ((equal msg "/off") (second preset))))))
+     buffer)))
 
 ;;; TODO: condition handler para evitar que erros mandem a thread abaixo
 
