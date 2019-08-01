@@ -1,7 +1,6 @@
 ;;;; jamais-vu.lisp
 
 (in-package #:jamais-vu)
-(in-readtable :qtools)
 
 (defparameter *server-sample-rate* 44100
   "The sample rate of the audio server.")
@@ -94,7 +93,7 @@
    (sub-bufs
     :accessor sub-bufs
     :documentation "A list of buffers, resulting from the partitioning of the main buffer."))
-  :documentation "A self-contained abstraction for the recording and playing of an audio sample, stored in the server. Despite the name, it may actually loop or not.")
+  (:documentation "A self-contained abstraction for the recording and playing of an audio sample, stored in the server. Despite the name, it may actually loop or not."))
 
 (defmethod initialize-instance :after ((new-looper looper) &key)
   "Allocate the necessary audio buffers in the server."
@@ -123,7 +122,11 @@
 
 (defun default-looper ()
   "Return the default looper."
-    (find-looper-by-name "Default"))
+  (find-looper-by-name "Default"))
+
+(defun buffer-contents (&optional (looper (default-looper)))
+  "Return a list with the audio frames on the buffer of LOOPER."
+  (buffer-load-to-list (buffer looper)))
 
 
 ;;; Synth definitions
@@ -222,7 +225,7 @@
 (defun osc-responder (node id value &optional (qobject nil))
   (case id
     ;; Recording stopped
-    (+rec-done+
+    (#.+rec-done+
      (when qobject (signal! qobject (rec-stop float) value))
      (format t "~&Rec stop. Dur: ~a~%" value)
      (let ((looper (find-recording-looper-by-node-id node)))
@@ -243,19 +246,21 @@
 	       recording-p nil))))
 
     ;; Onset detected
-    (+onset+
+    (#.+onset+
      (let ((looper (find-recording-looper-by-node-id node)))
        (push value (inter-onset-timings looper))
        (format t "~&Onset: ~a~%" value)))
 
     ;; Playing stopped
-    (+play-done+
+    (#.+play-done+
      (let* ((looper (find-playing-looper-by-node-id node))
 	    (nodes (player-nodes looper)))
        (setf (player-nodes looper) (remove (find node nodes :key #'sc::id)
 					   nodes))))
 
-    (otherwise (format t "~&Unable to handle OSC message with node ~a, id ~a, and value ~a.~%" node id value))))
+    (otherwise
+     (format t "~&Unable to handle OSC message with node ~a, id ~a, and value ~a.~%"
+	     node id value))))
 
 (add-reply-responder "/tr" #'osc-responder)
 
@@ -312,8 +317,8 @@
 	(progn
 	  (setf (playing-p looper) nil
 		(looping-p looper) nil)
-	  (when *window*
-	    (signal! *window* (play-finished string) "PLAY"))))))
+	  (when jamais-vu.gui:*window*
+	    (cl+qt:signal! jamais-vu.gui:*window* (play-finished string) "PLAY"))))))
 
 (defun start-playing-random-start (&key
 				     (looper (default-looper))
@@ -499,137 +504,6 @@
 
 ;;; TODO Put GUI code in a new file.
 
-(defvar *window* nil)
-
-(define-widget main-window (QWidget)
-	       ())
-
-(define-widget plot (QWidget)
-	       ((max-y :initarg :max-y :accessor max-y)
-		(min-y :initarg :min-y :accessor min-y)
-		(step-x :initarg :step-x :accessor step-x)
-		(grid :initarg :grid :accessor grid)
-		(data :initarg :data :accessor data)
-		(adjust :initarg :adjust :accessor adjust))
-	       (:default-initargs
-		:max-y 100
-		:min-y -100
-		:step-x NIL
-		:grid NIL
-		:adjust T
-		:data NIL))
-
-(defmethod (setf data) :after (value (plot plot))
-  (q+:repaint plot))
-
-(define-override (plot paint-event) (ev)
-  (declare (ignore ev))
-  (with-finalizing ((painter (q+:make-qpainter plot))
-		    (line (q+:make-qlinef)))
-    (loop :for segment :across data
-	  :do (destructuring-bind (x1 y1 x2 y2) segment
-		(setf (q+:line line) (values x1 y1 x2 y2))
-		(q+:draw-line painter line)))))
-
-(defun points (data width height)
-  "From a vector of samples DATA return a vector of line segments in the form (x1 y1 x2 y2), for plotting the samples in a graph with WIDTH x HEIGHT pixels."
-  (let* ((data-len (length data))
-	 (step (truncate (/ data-len width)))
-	 (zero-y (/ height 2)))
-    (loop :with result := (make-array (truncate (/ data-len step))
-				      :fill-pointer 0)
-	  :for read-pointer :upto (- data-len step) :by step
-	  :for data-segment := (subseq data read-pointer (+ read-pointer step))
-	  :for i :from 0
-	  :do (vector-push 
-	       (loop :for d :across data-segment
-		     :maximize d :into max
-		     :minimize d :into min
-		     :finally (return (let ((x1 i)
-					    (y1 (- zero-y (* max zero-y)))
-					    (x2 i)
-					    (y2 (+ zero-y (* (abs min) zero-y))))
-					(list x1 y1 x2 y2))))
-	       result)
-	  :finally (return result))))
-
-(define-subwidget (main-window plot) (make-instance 'plot)
-  (setf (q+:minimum-size plot) (values 600 350))
-  (let ((data (buffer-load-to-list (buffer (default-looper)))))
-    (setf (data plot) (points (make-array (length data)
-					  :initial-contents data)
-			      600 350))))
-
-(define-subwidget (main-window rec-button) (q+:make-qpushbutton "REC" main-window))
-
-(define-subwidget (main-window stop-button) (q+:make-qpushbutton "STOP" main-window))
-
-(define-subwidget (main-window play-button) (q+:make-qpushbutton "PLAY" main-window))
-
-(define-subwidget (main-window play-rnd-button) (q+:make-qpushbutton "PLAYRND" main-window))
-
-(define-subwidget (main-window layout) (q+:make-qvboxlayout main-window)
-  (setf (q+:window-title main-window) "Buffer")
-  (q+:add-widget layout plot)
-  (let ((inner (q+:make-qhboxlayout)))
-    (q+:add-widget inner rec-button)
-    (q+:add-widget inner stop-button)
-    (q+:add-widget inner play-button)
-    (q+:add-widget inner play-rnd-button)
-    (q+:add-layout layout inner)))
-
-(defun replot (plot)
-  (let ((width (q+:width plot))
-	(height (q+:height plot))
-	(data (buffer-load-to-list (buffer (default-looper)))))
-    (setf (data plot) (points (make-array (length data)
-					  :initial-contents data)
-			      width height))
-    (q+:repaint plot)))
-
-(define-override (main-window resize-event) (ev)
-  (declare (ignore ev))
-  (replot plot))
-
-(define-signal (main-window rec-stop) (float))
-(define-signal (main-window play-finished) (string))
-
-(define-slot (main-window record) ()
-  (declare (connected rec-button (pressed)))
-  (setf (q+:text rec-button) "Recording")
-  (start-recording))
-
-(define-slot (main-window stop) ()
-  (declare (connected stop-button (pressed)))
-  (signal! main-window (rec-stop float) 0.0))
-
-(define-slot (main-window play) ()
-  (declare (connected play-button (pressed)))
-  (setf (q+:text play-button) "Playing")
-  (start-playing))
-
-(define-slot (main-window play-rnd) ()
-  (declare (connected play-rnd-button (pressed)))
-  (setf (q+:text play-rnd-button) "Playing")
-  (start-playing-random-start :dur (+ 0.1 (random 0.25))))
-
-(define-slot (main-window rec-stop) ((dur float))
-  (declare (connected main-window (rec-stop float)))
-  (setf (q+:text rec-button) "REC")
-  (replot plot))
-
-(define-slot (main-window play-finished) ((new-label string))
-  (declare (connected main-window (play-finished string)))
-  (setf (q+:text play-button) new-label))
-
-(defun main ()
-  (with-main-window (window 'main-window)
-    (setf *window* window)
-    (remove-reply-responder "/tr")
-    (add-reply-responder "/tr" (lambda (node id value)
-				 (osc-responder node id value window))))
-  (add-reply-responder "/tr" #'osc-responder)
-  (setf *window* nil))
 
 
 ;;; OSC interface

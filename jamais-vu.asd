@@ -14,4 +14,5 @@
 	       #:usocket-server
 	       #:cl-sndfile)
   :components ((:file "package")
-               (:file "jamais-vu")))
+               (:file "jamais-vu")
+	       (:file "gui")))
