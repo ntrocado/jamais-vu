@@ -364,10 +364,8 @@
 ;; TODO it's better to just change the sign when random > prob. Compare results.
 (defun random-sign (x prob)
   (if (> prob (random 1.0))
-    (if (zerop (1- (random 2)))
-	(abs x)
-	(- (abs x)))
-    x))
+      (- x)
+      x))
 
 (defun random-sign-delta (seq prob)
   (typecase seq
@@ -401,7 +399,8 @@
   "Destructively transforms the audio buffer in LOOPER, so that each pair of frames is replaced by the value of their difference. Furthermore, this number can be randomly inverted, with probability PROB (between 0 and 1)."
   (let* ((old-buffer (buffer looper))
 	 (deltas (random-sign-delta (buffer-load-to-list old-buffer)
-				    prob)))
+				    (/ prob 2)))) ; when prob==1 the signal is just phase inverted;
+					          ; 0.5 corresponds to the  maximum effect
     (buffer-load-from-list (buffer looper)
 			   (loop :for d :in deltas
 				 :for v := (buffer-get old-buffer 0)
