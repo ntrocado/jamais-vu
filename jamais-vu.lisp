@@ -361,7 +361,6 @@
 
 ;;; Random sign delta
 
-;; TODO it's better to just change the sign when random > prob. Compare results.
 (defun random-sign (x prob)
   (if (> prob (random 1.0))
       (- x)
@@ -498,11 +497,6 @@
 ;;       (let ((next-time (+ time bdur offset)))
 ;;         (callback next-time #'play-sub-buffers
 ;; 		  :order (rest order) :time next-time :offset offset)))))
-
-;;; GUI
-
-;;; TODO Put GUI code in a new file.
-
 
 
 ;;; OSC interface
