@@ -226,7 +226,7 @@
   (case id
     ;; Recording stopped
     (#.+rec-done+
-     (when qobject (signal! qobject (rec-stop float) value))
+     (when qobject (cl+qt:signal! qobject (jamais-vu.gui::rec-stop jamais-vu.gui::float) value))
      (format t "~&Rec stop. Dur: ~a~%" value)
      (let ((looper (find-recording-looper-by-node-id node)))
        (with-accessors ((buffer buffer) (dur dur) (loop-start loop-start)
@@ -268,13 +268,14 @@
 ;;; Recording
 
 (defun start-recording (&key (looper (default-looper)) (in *default-input*) (loop 0))
-  (setf (recording-p looper) t
-	(absolute-onset-timings looper) nil
-	(recorder-node looper) (synth 'record-buf
-				      :in in
-				      :bufn (bufnum (buffer looper))
-				      :run 1
-				      :loop loop)))
+  (unless (recording-p looper)
+    (setf (absolute-onset-timings looper) nil
+	  (recorder-node looper) (synth 'record-buf
+					:in in
+					:bufn (bufnum (buffer looper))
+					:run 1
+					:loop loop)
+	  (recording-p looper) t)))
 
 (defun stop-recording (&key (looper (default-looper)))
   (when (recording-p looper)
@@ -386,6 +387,7 @@
     (sf:write-frames-float frames file)))
 
 (defun buffer-load-from-list (buffer frames)
+  "Send FRAMES to BUFFER using a temporary file."
   (uiop:with-temporary-file (:stream file
 			     :pathname path
 			     :type "wav"
@@ -460,43 +462,45 @@
 
 ;;; Sub-buffers
 
-;; (defun populate-sub-buffers ()
-;;   (let* ((data (buffer-load-to-list *buf*))
-;; 	 (data-len (length data))
-;; 	 (samples (make-array data-len
-;; 			      :initial-contents (buffer-load-to-list *buf*))))
-;;     (mapc (lambda (sub-buf)
-;;             (let* ((sub-samples (/ data-len *number-of-sub-bufs*))
-;;                    (start (* (position sub-buf *sub-bufs*)
-;;                              sub-samples))
-;;                    (end (+ start sub-samples)))
-;;               (setf (frames sub-buf) sub-samples)
-;;               (buffer-setn sub-buf (coerce (subseq samples start end) 'list))))
-;;           *sub-bufs*)))
+;;; TODO refactor with the looper classs
+(defun populate-sub-buffers (&key (looper (default-looper)))
+  (mapc (lambda (sub-buf)
+	  (let* ((sub-samples (/ (frames (buffer looper))
+				 (number-of-sub-bufs looper)))
+		 (start (* (position sub-buf (sub-bufs looper))
+			   sub-samples))
+		 (end (+ start sub-samples)))
+	    (setf (frames sub-buf) sub-samples)
+	    (buffer-load-from-list sub-buf (coerce (subseq (buffer-contents looper)
+							   start end)
+						   'list))))
+	(sub-bufs looper)))
 
-;; (defun play-sub-buffers (&key (order '(0 1 2 3 4 5 6 7))
-;;                               (time (now))
-;;                               (offset 0))
-;;   (when order
-;;     (destructuring-bind (id &key
-;; 			      ((:dur bdur) (buffer-dur (nth id *sub-bufs*)))
-;; 			      ((:rate rate) 1.0)
-;; 			      ((:start-pos start-pos) 0.0)
-;; 			      ((:amp amp) 1.0))
-;; 	(let ((this-time (first order)))
-;; 	  (if (and (integerp this-time)
-;; 		   (< this-time 0))
-;; 	      (list (abs this-time) :amp 0.0)
-;; 	      (alexandria:ensure-list this-time)))
-;;       (when (>= id 0)
-;;         (at time (synth 'play-buf :bufn (bufnum (nth id *sub-bufs*))
-;;                                   :dur bdur
-;;                                   :rate rate
-;;                                   :start-pos start-pos
-;; 				  :amp amp)))
-;;       (let ((next-time (+ time bdur offset)))
-;;         (callback next-time #'play-sub-buffers
-;; 		  :order (rest order) :time next-time :offset offset)))))
+(defun play-sub-buffers (&key
+			   (looper (default-looper))
+			   (order '(0 1 2 3 4 5 6 7))
+			   (time (now))
+			   (offset 0))
+  (when order
+    (destructuring-bind (id &key
+			      ((:dur bdur) (buffer-dur (nth id (sub-bufs looper))))
+			      ((:rate rate) 1.0)
+			      ((:start-pos start-pos) 0.0)
+			      ((:amp amp) 1.0))
+	(let ((this-time (first order)))
+	  (if (and (integerp this-time)
+		   (< this-time 0))
+	      (list (abs this-time) :amp 0.0)
+	      (alexandria:ensure-list this-time)))
+      (when (>= id 0)
+        (at time (synth 'play-buf :bufn (bufnum (nth id (sub-bufs looper)))
+                                  :dur bdur
+                                  :rate rate
+                                  :start-pos start-pos
+				  :amp amp)))
+      (let ((next-time (+ time bdur offset)))
+        (callback next-time #'play-sub-buffers
+		  :order (rest order) :time next-time :offset offset)))))
 
 
 ;;; OSC interface

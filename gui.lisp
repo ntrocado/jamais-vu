@@ -64,7 +64,9 @@
 					  :initial-contents data)
 			      600 350))))
 
-(define-subwidget (main-window rec-button) (q+:make-qpushbutton "REC" main-window))
+(define-subwidget (main-window rec-button)
+    (q+:make-qpushbutton "REC" main-window)
+  (setf (q+:checkable rec-button) t))
 
 (define-subwidget (main-window stop-button) (q+:make-qpushbutton "STOP" main-window))
 
@@ -99,9 +101,10 @@
 (define-signal (main-window play-finished) (string))
 
 (define-slot (main-window record) ()
-  (declare (connected rec-button (pressed)))
-  (setf (q+:text rec-button) "Recording")
-  (jamais-vu:start-recording))
+  (declare (connected rec-button (toggled boolean)))
+  (if (q+:is-checked rec-button)
+      (progn (jamais-vu:start-recording) (setf (q+:text rec-button) "Recording"))
+      (progn (jamais-vu:stop-recording) (setf (q+:text rec-button) "REC"))))
 
 (define-slot (main-window stop) ()
   (declare (connected stop-button (pressed)))
@@ -119,7 +122,7 @@
 
 (define-slot (main-window rec-stop) ((dur float))
   (declare (connected main-window (rec-stop float)))
-  (setf (q+:text rec-button) "REC")
+  (setf (q+:checked rec-button) nil)
   (replot plot))
 
 (define-slot (main-window play-finished) ((new-label string))
