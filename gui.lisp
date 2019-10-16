@@ -64,22 +64,19 @@
 					  :initial-contents data)
 			      600 350))))
 
-(define-subwidget (main-window rec-button)
-    (q+:make-qpushbutton "REC" main-window)
+(define-subwidget (main-window rec-button) (q+:make-qpushbutton "REC" main-window)
   (setf (q+:checkable rec-button) t))
 
-(define-subwidget (main-window stop-button) (q+:make-qpushbutton "STOP" main-window))
+(define-subwidget (main-window play-button) (q+:make-qpushbutton "PLAY" main-window)
+  (setf (q+:checkable play-button) t))
 
-(define-subwidget (main-window play-button) (q+:make-qpushbutton "PLAY" main-window))
-
-(define-subwidget (main-window play-rnd-button) (q+:make-qpushbutton "PLAYRND" main-window))
+(define-subwidget (main-window play-rnd-button) (q+:make-qpushbutton "HIT" main-window))
 
 (define-subwidget (main-window layout) (q+:make-qvboxlayout main-window)
   (setf (q+:window-title main-window) "Buffer")
   (q+:add-widget layout plot)
   (let ((inner (q+:make-qhboxlayout)))
     (q+:add-widget inner rec-button)
-    (q+:add-widget inner stop-button)
     (q+:add-widget inner play-button)
     (q+:add-widget inner play-rnd-button)
     (q+:add-layout layout inner)))
@@ -106,18 +103,19 @@
       (progn (jamais-vu:start-recording) (setf (q+:text rec-button) "Recording"))
       (progn (jamais-vu:stop-recording) (setf (q+:text rec-button) "REC"))))
 
-(define-slot (main-window stop) ()
-  (declare (connected stop-button (pressed)))
-  (signal! main-window (rec-stop float) 0.0))
-
 (define-slot (main-window play) ()
-  (declare (connected play-button (pressed)))
-  (setf (q+:text play-button) "Playing")
-  (jamais-vu:start-playing))
+  (declare (connected play-button (toggled boolean)))
+  (if (q+:is-checked play-button)
+      (progn (jamais-vu:start-playing)
+	     (setf (q+:text play-button) "Playing"
+		   (q+:enabled play-rnd-button) nil))
+      (progn (jamais-vu:stop-playing)
+	     (setf (q+:text play-button) "PLAY"
+		   (q+:enabled play-rnd-button) t))))
 
 (define-slot (main-window play-rnd) ()
   (declare (connected play-rnd-button (pressed)))
-  (setf (q+:text play-rnd-button) "Playing")
+  (setf (q+:enabled play-button) nil)
   (jamais-vu:start-playing-random-start :dur (+ 0.1 (random 0.25))))
 
 (define-slot (main-window rec-stop) ((dur float))
@@ -127,7 +125,8 @@
 
 (define-slot (main-window play-finished) ((new-label string))
   (declare (connected main-window (play-finished string)))
-  (setf (q+:text play-button) new-label))
+  (setf (q+:text play-button) new-label
+	(q+:enabled play-button) t))
 
 (defun main ()
   (with-main-window (window 'main-window)

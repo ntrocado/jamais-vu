@@ -2,6 +2,11 @@
 
 (in-package #:jamais-vu)
 
+;;; Constants for the message id sent by the audio server on trigger events
+(defconstant +rec-done+ 0)
+(defconstant +onset+ 1)
+(defconstant +play-done+ 2)
+
 (defparameter *server-sample-rate* 44100
   "The sample rate of the audio server.")
 (defparameter *default-buffer-duration* 8.0
@@ -128,6 +133,12 @@
   "Return a list with the audio frames on the buffer of LOOPER."
   (buffer-load-to-list (buffer looper)))
 
+(defun load-sound-file (path &optional (looper (default-looper)))
+  "Load file in PATH into LOOPER."
+  (setf (buffer looper)
+	(buffer-read-channel path :channels 0
+				  :bufnum (bufnum (buffer looper)))))
+
 
 ;;; Synth definitions
 
@@ -199,11 +210,6 @@
 
 
 ;;; OSC message responder
-
-;;; Constants for the message id sent by the audio server on trigger events
-(defconstant +rec-done+ 0)
-(defconstant +onset+ 1)
-(defconstant +play-done+ 2)
 
 (defun inter-onset->absolute (iot)
   (loop :for v :in iot
@@ -298,28 +304,29 @@
 			 ))
   (with-accessors ((buffer buffer) (looper-dur dur))
       looper
-    (if (or (plusp n) (looping-p looper))
-	(let ((dur (min dur (buffer-dur buffer))))
-	  (setf (playing-p looper) t)
-	  (at time (push (synth 'play-buf :bufn (bufnum buffer)
-					  :dur dur
-					  :start-pos start-pos)
-			 (player-nodes looper)))
-	  (let ((next-time (- (+ time dur) offset)))
-	    (callback next-time
-		      #'start-playing
-		      :looper looper
-		      :time next-time
-		      :dur dur
-		      :n (- n 1)
-		      :offset offset
-		      :start-pos start-pos)))
-	;; no more repetitions
-	(progn
-	  (setf (playing-p looper) nil
-		(looping-p looper) nil)
-	  (when jamais-vu.gui:*window*
-	    (cl+qt:signal! jamais-vu.gui:*window* (play-finished string) "PLAY"))))))
+    (unless (playing-p looper)
+      (if (or (plusp n) (looping-p looper))
+	  (let ((dur (min dur (buffer-dur buffer))))
+	    (setf (playing-p looper) t)
+	    (at time (push (synth 'play-buf :bufn (bufnum buffer)
+					    :dur dur
+					    :start-pos start-pos)
+			   (player-nodes looper)))
+	    (let ((next-time (- (+ time dur) offset)))
+	      (callback next-time
+			#'start-playing
+			:looper looper
+			:time next-time
+			:dur dur
+			:n (- n 1)
+			:offset offset
+			:start-pos start-pos)))
+	  ;; no more repetitions
+	  (progn
+	    (setf (playing-p looper) nil
+		  (looping-p looper) nil)
+	    (when jamais-vu.gui:*window*
+	      (cl+qt:signal! jamais-vu.gui:*window* (play-finished string) "PLAY")))))))
 
 (defun start-playing-random-start (&key
 				     (looper (default-looper))
@@ -398,8 +405,7 @@
 
 (defun buf-random-sign-delta (&key (looper (default-looper)) (prob 0.7))
   "Destructively transforms the audio buffer in LOOPER, so that each pair of frames is replaced by the value of their difference. Furthermore, this number can be randomly inverted, with probability PROB (between 0 and 1)."
-  (let* ((old-buffer (buffer looper))
-	 (deltas (random-sign-delta (buffer-load-to-list old-buffer)
+  (let* ((old-buffer (buffer looper))	 (deltas (random-sign-delta (buffer-load-to-list old-buffer)
 				    (/ prob 2)))) ; when prob==1 the signal is just phase inverted;
 					          ; 0.5 corresponds to the  maximum effect
     (buffer-load-from-list (buffer looper)
