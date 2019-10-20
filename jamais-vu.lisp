@@ -27,7 +27,11 @@
 
 (defun server-start ()
   "Defines a SuperCollider server and boots it."
-  (setf *s* (make-external-server "localhost" :port 4445))
+  (setf *s* (make-external-server "localhost"
+				  :server-options (make-server-options :block-size 16
+								       :hardware-samplerate 44100
+								       :device "ASIO : ASIO Fireface")
+				  :port 4444))
   (server-boot *s*))
 
 ;;; Boot the server if it's not running already
