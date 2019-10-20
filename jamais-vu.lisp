@@ -308,29 +308,28 @@
 			 ))
   (with-accessors ((buffer buffer) (looper-dur dur))
       looper
-    (unless (playing-p looper)
-      (if (or (plusp n) (looping-p looper))
-	  (let ((dur (min dur (buffer-dur buffer))))
-	    (setf (playing-p looper) t)
-	    (at time (push (synth 'play-buf :bufn (bufnum buffer)
-					    :dur dur
-					    :start-pos start-pos)
-			   (player-nodes looper)))
-	    (let ((next-time (- (+ time dur) offset)))
-	      (callback next-time
-			#'start-playing
-			:looper looper
-			:time next-time
-			:dur dur
-			:n (- n 1)
-			:offset offset
-			:start-pos start-pos)))
-	  ;; no more repetitions
-	  (progn
-	    (setf (playing-p looper) nil
-		  (looping-p looper) nil)
-	    (when jamais-vu.gui:*window*
-	      (cl+qt:signal! jamais-vu.gui:*window* (play-finished string) "PLAY")))))))
+    (if (or (plusp n) (looping-p looper))
+	(let ((dur (min dur (buffer-dur buffer))))
+	  (setf (playing-p looper) t)
+	  (at time (push (synth 'play-buf :bufn (bufnum buffer)
+					  :dur dur
+					  :start-pos start-pos)
+			 (player-nodes looper)))
+	  (let ((next-time (- (+ time dur) offset)))
+	    (callback next-time
+		      #'start-playing
+		      :looper looper
+		      :time next-time
+		      :dur dur
+		      :n (- n 1)
+		      :offset offset
+		      :start-pos start-pos)))
+	;; no more repetitions
+	(progn
+	  (setf (playing-p looper) nil
+		(looping-p looper) nil)
+	  (when jamais-vu.gui:*window*
+	    (cl+qt:signal! jamais-vu.gui:*window* (play-finished string) "PLAY"))))))
 
 (defun start-playing-random-start (&key
 				     (looper (default-looper))
@@ -350,6 +349,9 @@
 (defun start-looping (&key (looper (default-looper)))
   (setf (looping-p looper) t)
   (start-playing :looper looper))
+
+(defun stop-looping (&key (looper (default-looper)))
+  (stop-playing :looper looper))
 
 (defun stop-playing (&key (looper (default-looper)))
   (with-accessors ((playing-p playing-p) (player-nodes player-nodes))

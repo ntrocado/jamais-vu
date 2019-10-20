@@ -64,6 +64,8 @@
 					  :initial-contents data)
 			      600 350))))
 
+(define-subwidget (main-window loop-checkbox) (q+:make-qcheckbox "&Loop" main-window))
+
 (define-subwidget (main-window rec-button) (q+:make-qpushbutton "REC" main-window)
   (setf (q+:checkable rec-button) t))
 
@@ -76,6 +78,7 @@
   (setf (q+:window-title main-window) "Buffer")
   (q+:add-widget layout plot)
   (let ((inner (q+:make-qhboxlayout)))
+    (q+:add-widget inner loop-checkbox)
     (q+:add-widget inner rec-button)
     (q+:add-widget inner play-button)
     (q+:add-widget inner play-rnd-button)
@@ -96,6 +99,10 @@
 
 (define-signal (main-window rec-stop) (float))
 (define-signal (main-window play-finished) (string))
+
+(define-slot (main-window loop) ()
+  (declare (connected loop-checkbox (toggled boolean)))
+  )
 
 (define-slot (main-window record) ()
   (declare (connected rec-button (toggled boolean)))
