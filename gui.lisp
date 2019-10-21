@@ -101,8 +101,8 @@
 (define-signal (main-window play-finished) (string))
 
 (define-slot (main-window loop) ()
-  (declare (connected loop-checkbox (toggled boolean)))
-  )
+  (declare (connected loop-checkbox (state-changed int)))
+  (setf (jamais-vu:looping-p (jamais-vu:default-looper)) (q+:is-checked loop-checkbox)))
 
 (define-slot (main-window record) ()
   (declare (connected rec-button (toggled boolean)))
