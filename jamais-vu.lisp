@@ -207,10 +207,14 @@
 
 ;;; Global volume
 
+;; TODO This only controls the mix for the live signal
 (proxy :volume
-       (with-controls ((amp 1))
+       (with-controls ((amp 0))
 	 (pan2.ar (in.ar 2) 0.0 amp))
        :pos :tail)
+
+;; To hear the live signal:
+;; (ctrl :volume :amp 1)
 
 
 ;;; OSC message responder
