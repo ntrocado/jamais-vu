@@ -133,7 +133,8 @@
 (define-slot (main-window play-finished) ((new-label string))
   (declare (connected main-window (play-finished string)))
   (setf (q+:text play-button) new-label
-	(q+:enabled play-button) t))
+	(q+:enabled play-button) t
+	(q+:checked play-button) nil))
 
 (defun main ()
   (with-main-window (window 'main-window)
