@@ -330,8 +330,7 @@
 		      :start-pos start-pos)))
 	;; no more repetitions
 	(progn
-	  (setf (playing-p looper) nil
-		(looping-p looper) nil)
+	  (setf (playing-p looper) nil)
 	  (when jamais-vu.gui:*window*
 	    (cl+qt:signal! jamais-vu.gui:*window* (play-finished string) "PLAY"))))))
 
@@ -355,15 +354,14 @@
   (start-playing :looper looper))
 
 (defun stop-looping (&key (looper (default-looper)))
-  (stop-playing :looper looper))
+  (setf (looping-p looper) nil))
 
 (defun stop-playing (&key (looper (default-looper)))
   (with-accessors ((playing-p playing-p) (player-nodes player-nodes))
       looper
     (when playing-p
       (mapc (lambda (n) (ctrl n :gate 0)) player-nodes))
-    (setf (playing-p looper) nil
-	  (looping-p looper) nil)))
+    (setf (playing-p looper) nil)))
 
 ;;; Clear buffer
 
