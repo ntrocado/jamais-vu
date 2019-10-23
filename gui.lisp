@@ -29,7 +29,12 @@
 (define-override (plot paint-event) (ev)
   (declare (ignore ev))
   (with-finalizing ((painter (q+:make-qpainter plot))
+		    (pen (q+:make-qpen))
 		    (line (q+:make-qlinef)))
+    (setf (q+:width pen) 2)
+    (setf (q+ color pen) (apply #'q+:make-qcolor (loop :repeat 4
+						       :collect (random 255))))
+    (setf (q+:pen painter) pen)
     (loop :for segment :across data
 	  :do (destructuring-bind (x1 y1 x2 y2) segment
 		(setf (q+:line line) (values x1 y1 x2 y2))
