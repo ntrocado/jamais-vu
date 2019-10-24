@@ -9,6 +9,7 @@
   :depends-on (#:qtools
 	       #:qtcore
 	       #:qtgui
+	       #:qtools-elements
 	       #:alexandria
 	       #:cl-collider
 	       #:usocket-server
