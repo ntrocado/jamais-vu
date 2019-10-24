@@ -83,27 +83,47 @@
 
 ;;; Grains
 
+(define-subwidget (main-window grains-pos-slider)
+    (make-instance 'qtools-elements:slider
+		   :maximum 100.0
+		   :minimum 1.0
+		   :stepping 0.01
+		   :default 50
+		   :caption "Position"
+		   :curve :lin))
+
+(define-subwidget (main-window grains-rate-slider)
+    (make-instance 'qtools-elements:slider
+		   :maximum 120
+		   :minimum 8
+		   :stepping 0.01
+		   :default 32
+		   :caption "Rate"
+		   :curve :exp))
+
 (define-subwidget (main-window grains-group) (q+:make-qgroupbox "TGrains")
   (setf (q+:checkable grains-group) t
 	(q+:checked grains-group) nil)
-  (let ((grains-pos-slider (make-instance 'qtools-elements:slider
-					  :maximum 100.0
-					  :minimum 1.0
-					  :stepping 0.01
-					  :default 50
-					  :caption "Position"
-					  :curve :lin))
-	(grains-rate-slider (make-instance 'qtools-elements:slider
-					   :maximum 120
-					   :minimum 8
-					   :stepping 0.01
-					   :default 32
-					   :caption "Rate"
-					   :curve :exp))
-	(grains-layout (q+:make-qvboxlayout)))
+  (let ((grains-layout (q+:make-qvboxlayout)))
     (q+:add-widget grains-layout grains-pos-slider)
     (q+:add-widget grains-layout grains-rate-slider)
     (setf (q+:layout grains-group) grains-layout)))
+
+(define-slot (main-window grains-pos-slider) ((value double))
+      (declare (connected grains-pos-slider (value-changed double)))
+  (jamais-vu::ctrl-t-grains :pos value))
+
+(define-slot (main-window grains-rate-slider) ((value double))
+      (declare (connected grains-rate-slider (value-changed double)))
+  (jamais-vu::ctrl-t-grains :rate value))
+
+(define-slot (main-window grains) ()
+  (declare (connected grains-group (toggled boolean)))
+  (if (q+:is-checked grains-group) 
+      (jamais-vu:t-grains)
+      (jamais-vu:stop-t-grains)))
+
+;;; Layout
 
 (define-subwidget (main-window layout) (q+:make-qvboxlayout main-window)
   (setf (q+:window-title main-window) "Buffer")

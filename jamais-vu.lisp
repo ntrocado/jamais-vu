@@ -449,17 +449,21 @@
 				    0.01)
 				 (t-rand.kr 0 0.01 clk)))
 		    (pan (white-noise.kr 0.6)))
-	       (tgrains.ar 2 clk buffer 1 position dur pan 0.5)))))
+	       (tgrains.ar 2 clk buffer 1 position dur pan 0.5)))
+	   :fade 3.0))
   (setf *t-grains-on* t))
 
 (defun stop-t-grains ()
-  (free :t-grains)
+  (ctrl :t-grains :gate 0)
   (setf *t-grains-on* nil))
 
 (defun toggle-t-grains (&key (looper (default-looper)))
   (if *t-grains-on*
       (stop-t-grains)
       (t-grains :looper looper)))
+
+(defun ctrl-t-grains (param val)
+  (ctrl :t-grains param val))
 
 
 ;;; Poeira
