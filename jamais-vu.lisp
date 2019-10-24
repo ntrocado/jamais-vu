@@ -13,8 +13,12 @@
   "Default buffer duration in seconds.")
 (defparameter *default-number-of-sub-bufs* 8
   "Default number of sub-buffers.")
-(defparameter *default-input* 0
+(defparameter *default-input* 1
   "Default recording input in the audio interface.")
+
+;; Uncomment and eval to control synths with the mouse.
+;; Otherwise use CTRL or the GUI
+;(pushnew :mouse *features*)
 
 (defvar *external-osc-port* 8000
   "OSC port of the external controller device.")
@@ -434,13 +438,18 @@
 (defun t-grains (&key (looper (default-looper)))
   (with-accessors ((buffer buffer)) looper
     (proxy :t-grains
-	   (let* ((t-rate (mouse-y.kr 8 120 :exp))
-		  (dur (/ 12 t-rate))
-		  (clk (impulse.kr t-rate))
-		  (pos (+ (mouse-x.kr 0 (buf-dur.kr buffer))
-			  (t-rand.kr 0 0.01 clk)))
-		  (pan (white-noise.kr 0.6)))
-	     (tgrains.ar 2 clk buffer 1 pos dur pan 0.5))))
+	   (with-controls ((rate 32) (pos 50))
+	     (let* ((t-rate #+mouse (mouse-y.kr 8 120 :exp)
+			    #-mouse rate)
+		    (dur (/ 12 t-rate))
+		    (clk (impulse.kr t-rate))
+		    (position (+ (* (buf-dur.kr buffer)
+				    #+mouse (mouse-x.kr 0 100)
+				    #-mouse pos
+				    0.01)
+				 (t-rand.kr 0 0.01 clk)))
+		    (pan (white-noise.kr 0.6)))
+	       (tgrains.ar 2 clk buffer 1 position dur pan 0.5)))))
   (setf *t-grains-on* t))
 
 (defun stop-t-grains ()
