@@ -79,6 +79,32 @@
 
 (define-subwidget (main-window play-rnd-button) (q+:make-qpushbutton "HIT" main-window))
 
+;;; FX
+
+;;; Grains
+
+(define-subwidget (main-window grains-group) (q+:make-qgroupbox "TGrains")
+  (setf (q+:checkable grains-group) t
+	(q+:checked grains-group) nil)
+  (let ((grains-pos-slider (make-instance 'qtools-elements:slider
+					  :maximum 100.0
+					  :minimum 1.0
+					  :stepping 0.01
+					  :default 50
+					  :caption "Position"
+					  :curve :lin))
+	(grains-rate-slider (make-instance 'qtools-elements:slider
+					   :maximum 120
+					   :minimum 8
+					   :stepping 0.01
+					   :default 32
+					   :caption "Rate"
+					   :curve :exp))
+	(grains-layout (q+:make-qvboxlayout)))
+    (q+:add-widget grains-layout grains-pos-slider)
+    (q+:add-widget grains-layout grains-rate-slider)
+    (setf (q+:layout grains-group) grains-layout)))
+
 (define-subwidget (main-window layout) (q+:make-qvboxlayout main-window)
   (setf (q+:window-title main-window) "Buffer")
   (q+:add-widget layout plot)
@@ -87,7 +113,8 @@
     (q+:add-widget inner rec-button)
     (q+:add-widget inner play-button)
     (q+:add-widget inner play-rnd-button)
-    (q+:add-layout layout inner)))
+    (q+:add-layout layout inner))
+  (q+:add-widget layout grains-group))
 
 (defun replot (plot)
   (let ((width (q+:width plot))
