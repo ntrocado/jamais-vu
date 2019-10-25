@@ -530,6 +530,14 @@
 		  :order (rest order) :time next-time :offset offset)))))
 
 
+(defun sub-buffer-preset (preset)
+  (funcall (intern (concatenate 'string "PRESET-" (write-to-string preset)))))
+
+(defun preset-1 ()
+  (play-sub-buffers :order (loop :for i :from 0 :upto 60 :collect (list 2 :rate (* 8 (sin i))
+									  :dur (random 1.0) :amp 0.15))))
+
+
 ;;; OSC interface
 
 (defparameter *osc-controller-presets*
