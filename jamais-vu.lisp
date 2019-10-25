@@ -178,13 +178,13 @@
 		  (density 5)
 		  (attack 0.01)
 		  (release 0.01))
-  (let* ((frames (buf-frames.kr bufn))
-	 (trig (dust.kr density))
+  (let* ((frames (/ (buf-frames.kr bufn) 3))
+	 (trig (trig-1.ar (lf-noise0.ar density) 0.01))
 	 (sound (play-buf.ar 1 bufn 1.0
 			     :trig trig
 			     :start-pos (ti-rand.kr 0 frames trig)))
 	 (envelope (env-gen.kr (perc attack release) :gate trig)))
-    (out.ar out (* sound envelope))))
+    (out.ar out (* sound envelope 0.9))))
 
 ;;; https://en.wikibooks.org/wiki/Designing_Sound_in_SuperCollider/Schroeder_reverb
 (defsynth schroeder-reverb ()
@@ -474,8 +474,8 @@
   (setf *poeira-node* (synth 'poeira
 			     :bufn (bufnum (buffer looper))
 			     :density 10
-			     :attack 0.2
-			     :release 0.4)))
+			     :attack 0.04
+			     :release 0.02)))
 
 (defun stop-poeira (&optional (node *poeira-node*))
   (free node)

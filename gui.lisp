@@ -127,21 +127,21 @@
 
 (define-subwidget (main-window poeira-density-slider)
     (make-instance 'qtools-elements:slider
-		   :maximum 15
-		   :minimum 3
-		   :stepping 0.1
+		   :maximum 40
+		   :minimum 2
+		   :stepping 0.5
 		   :default 10
 		   :caption "Density"
 		   :curve :lin))
 
 (define-subwidget (main-window poeira-fade-slider)
     (make-instance 'qtools-elements:slider
-		   :maximum 1
-		   :minimum 0.1
+		   :maximum 0.8
+		   :minimum 0.01
 		   :stepping 0.01
-		   :default 0.2
-		   :caption "Fade"
-		   :curve :lin))
+		   :default 0.04
+		   :caption "Attack"
+		   :curve :exp))
 
 (define-subwidget (main-window poeira-group) (q+:make-qgroupbox "Poeira")
   (setf (q+:checkable poeira-group) t
@@ -157,7 +157,7 @@
 
 (define-slot (main-window poeira-fade-slider) ((value double))
       (declare (connected poeira-fade-slider (value-changed double)))
-  (sc:ctrl jamais-vu::*poeira-node* :fade value))
+  (sc:ctrl jamais-vu::*poeira-node* :attack value))
 
 (define-slot (main-window poeira) ()
   (declare (connected poeira-group (toggled boolean)))
