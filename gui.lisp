@@ -79,6 +79,8 @@
 
 (define-subwidget (main-window play-rnd-button) (q+:make-qpushbutton "HIT" main-window))
 
+(define-subwidget (main-window random-sign-delta-button) (q+:make-qpushbutton "DESTROY" main-window))
+
 ;;; FX
 
 ;;; Grains
@@ -175,6 +177,7 @@
     (q+:add-widget inner rec-button)
     (q+:add-widget inner play-button)
     (q+:add-widget inner play-rnd-button)
+    (q+:add-widget inner random-sign-delta-button)
     (q+:add-layout layout inner))
   (q+:add-widget layout grains-group)
   (q+:add-widget layout poeira-group))
@@ -219,6 +222,11 @@
   (declare (connected play-rnd-button (pressed)))
   (setf (q+:enabled play-button) nil)
   (jamais-vu:start-playing-random-start :dur (+ 0.1 (random 0.25))))
+
+(define-slot (main-window random-sign-delta-button) ()
+  (declare (connected random-sign-delta-button (pressed)))
+  (jamais-vu:buf-random-sign-delta)
+  (replot plot))
 
 (define-slot (main-window rec-stop) ((dur float))
   (declare (connected main-window (rec-stop float)))
