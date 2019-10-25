@@ -123,6 +123,48 @@
       (jamais-vu:t-grains)
       (jamais-vu:stop-t-grains)))
 
+;;; Poeira
+
+(define-subwidget (main-window poeira-density-slider)
+    (make-instance 'qtools-elements:slider
+		   :maximum 15
+		   :minimum 3
+		   :stepping 0.1
+		   :default 10
+		   :caption "Density"
+		   :curve :lin))
+
+(define-subwidget (main-window poeira-fade-slider)
+    (make-instance 'qtools-elements:slider
+		   :maximum 1
+		   :minimum 0.1
+		   :stepping 0.01
+		   :default 0.2
+		   :caption "Fade"
+		   :curve :lin))
+
+(define-subwidget (main-window poeira-group) (q+:make-qgroupbox "Poeira")
+  (setf (q+:checkable poeira-group) t
+	(q+:checked poeira-group) nil)
+  (let ((poeira-layout (q+:make-qvboxlayout)))
+    (q+:add-widget poeira-layout poeira-density-slider)
+    (q+:add-widget poeira-layout poeira-fade-slider)
+    (setf (q+:layout poeira-group) poeira-layout)))
+
+(define-slot (main-window poeira-density-slider) ((value double))
+      (declare (connected poeira-density-slider (value-changed double)))
+  (sc:ctrl jamais-vu::*poeira-node* :density value))
+
+(define-slot (main-window poeira-fade-slider) ((value double))
+      (declare (connected poeira-fade-slider (value-changed double)))
+  (sc:ctrl jamais-vu::*poeira-node* :fade value))
+
+(define-slot (main-window poeira) ()
+  (declare (connected poeira-group (toggled boolean)))
+  (if (q+:is-checked poeira-group) 
+      (jamais-vu:start-poeira)
+      (jamais-vu:stop-poeira)))
+
 ;;; Layout
 
 (define-subwidget (main-window layout) (q+:make-qvboxlayout main-window)
@@ -134,7 +176,8 @@
     (q+:add-widget inner play-button)
     (q+:add-widget inner play-rnd-button)
     (q+:add-layout layout inner))
-  (q+:add-widget layout grains-group))
+  (q+:add-widget layout grains-group)
+  (q+:add-widget layout poeira-group))
 
 (defun replot (plot)
   (let ((width (q+:width plot))
