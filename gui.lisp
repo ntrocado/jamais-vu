@@ -81,6 +81,8 @@
 
 (define-subwidget (main-window random-sign-delta-button) (q+:make-qpushbutton "DESTROY" main-window))
 
+(define-subwidget (main-window insert-sines-button) (q+:make-qpushbutton "SINES" main-window))
+
 ;;; FX
 
 ;;; Grains
@@ -206,6 +208,7 @@
     (q+:add-widget inner play-button)
     (q+:add-widget inner play-rnd-button)
     (q+:add-widget inner random-sign-delta-button)
+    (q+:add-widget inner insert-sines-button)
     (q+:add-layout layout inner))
   (q+:add-widget layout grains-group)
   (q+:add-widget layout poeira-group))
@@ -254,6 +257,11 @@
 (define-slot (main-window random-sign-delta-button) ()
   (declare (connected random-sign-delta-button (pressed)))
   (jamais-vu:buf-random-sign-delta)
+  (replot plot))
+
+(define-slot (main-window insert-sines-button) ()
+  (declare (connected insert-sines-button (pressed)))
+  (jamais-vu:insert-sines)
   (replot plot))
 
 (define-slot (main-window rec-stop) ((dur float))

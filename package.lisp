@@ -31,6 +31,7 @@
 	   #:stop-playing
 
 	   #:buf-random-sign-delta
+	   #:insert-sines
 
 	   #:t-grains
 	   #:stop-t-grains
