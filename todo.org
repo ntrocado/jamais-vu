@@ -1,3 +1,9 @@
 * DONE Botão de volume
   CLOSED: [2019-10-26 sáb 09:22]
-
+* TODO Add sub-bufs to gui (with presets) :gui:
+* TODO Hit button dependent on press duration :gui:
+* TODO Recording modes [0/3]
+** TODO Insert
+** TODO Mix
+** TODO Sync with playback
+* TODO Multiple buffers
