@@ -177,14 +177,15 @@
 		  bufn
 		  (density 5)
 		  (attack 0.01)
-		  (release 0.01))
+		  (release 0.01)
+		  (amp 1.0))
   (let* ((frames (/ (buf-frames.kr bufn) 3))
 	 (trig (trig-1.ar (lf-noise0.ar density) 0.01))
 	 (sound (play-buf.ar 1 bufn 1.0
 			     :trig trig
 			     :start-pos (ti-rand.kr 0 frames trig)))
 	 (envelope (env-gen.kr (perc attack release) :gate trig)))
-    (out.ar out (* sound envelope 0.9))))
+    (out.ar out (* sound envelope amp))))
 
 ;;; https://en.wikibooks.org/wiki/Designing_Sound_in_SuperCollider/Schroeder_reverb
 (defsynth schroeder-reverb ()
@@ -438,7 +439,7 @@
 (defun t-grains (&key (looper (default-looper)))
   (with-accessors ((buffer buffer)) looper
     (proxy :t-grains
-	   (with-controls ((rate 32) (pos 50))
+	   (with-controls ((rate 32) (pos 50) (amp 1.0))
 	     (let* ((t-rate #+mouse (mouse-y.kr 8 120 :exp)
 			    #-mouse rate)
 		    (dur (/ 12 t-rate))
@@ -449,7 +450,8 @@
 				    0.01)
 				 (t-rand.kr 0 0.01 clk)))
 		    (pan (white-noise.kr 0.6)))
-	       (tgrains.ar 2 clk buffer 1 position dur pan 0.5)))
+	       (* (tgrains.ar 2 clk buffer 1 position dur pan 0.5)
+		  amp)))
 	   :fade 3.0))
   (setf *t-grains-on* t))
 
@@ -475,7 +477,8 @@
 			     :bufn (bufnum (buffer looper))
 			     :density 10
 			     :attack 0.04
-			     :release 0.02)))
+			     :release 0.02
+			     :amp 1.0)))
 
 (defun stop-poeira (&optional (node *poeira-node*))
   (free node)

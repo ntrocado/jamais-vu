@@ -103,21 +103,35 @@
 		   :caption "Rate"
 		   :curve :exp))
 
+(define-subwidget (main-window grains-amp-slider)
+    (make-instance 'qtools-elements:slider
+		   :maximum 1.5
+		   :minimum 0.0
+		   :stepping 0.01
+		   :default 1.0
+		   :caption "Volume"
+		   :curve :lin))
+
 (define-subwidget (main-window grains-group) (q+:make-qgroupbox "TGrains")
   (setf (q+:checkable grains-group) t
 	(q+:checked grains-group) nil)
   (let ((grains-layout (q+:make-qvboxlayout)))
     (q+:add-widget grains-layout grains-pos-slider)
     (q+:add-widget grains-layout grains-rate-slider)
+    (q+:add-widget grains-layout grains-amp-slider)
     (setf (q+:layout grains-group) grains-layout)))
 
 (define-slot (main-window grains-pos-slider) ((value double))
-      (declare (connected grains-pos-slider (value-changed double)))
+  (declare (connected grains-pos-slider (value-changed double)))
   (jamais-vu::ctrl-t-grains :pos value))
 
 (define-slot (main-window grains-rate-slider) ((value double))
-      (declare (connected grains-rate-slider (value-changed double)))
+  (declare (connected grains-rate-slider (value-changed double)))
   (jamais-vu::ctrl-t-grains :rate value))
+
+(define-slot (main-window grains-amp-slider) ((value double))
+  (declare (connected grains-amp-slider (value-changed double)))
+  (jamais-vu::ctrl-t-grains :amp value))
 
 (define-slot (main-window grains) ()
   (declare (connected grains-group (toggled boolean)))
@@ -145,12 +159,22 @@
 		   :caption "Attack"
 		   :curve :exp))
 
+(define-subwidget (main-window poeira-amp-slider)
+    (make-instance 'qtools-elements:slider
+		   :maximum 1.5
+		   :minimum 0.0
+		   :stepping 0.01
+		   :default 1.0
+		   :caption "Volume"
+		   :curve :lin))
+
 (define-subwidget (main-window poeira-group) (q+:make-qgroupbox "Poeira")
   (setf (q+:checkable poeira-group) t
 	(q+:checked poeira-group) nil)
   (let ((poeira-layout (q+:make-qvboxlayout)))
     (q+:add-widget poeira-layout poeira-density-slider)
     (q+:add-widget poeira-layout poeira-fade-slider)
+    (q+:add-widget poeira-layout poeira-amp-slider)
     (setf (q+:layout poeira-group) poeira-layout)))
 
 (define-slot (main-window poeira-density-slider) ((value double))
@@ -160,6 +184,10 @@
 (define-slot (main-window poeira-fade-slider) ((value double))
       (declare (connected poeira-fade-slider (value-changed double)))
   (sc:ctrl jamais-vu::*poeira-node* :attack value))
+
+(define-slot (main-window poeira-amp-slider) ((value double))
+      (declare (connected poeira-amp-slider (value-changed double)))
+  (sc:ctrl jamais-vu::*poeira-node* :amp value))
 
 (define-slot (main-window poeira) ()
   (declare (connected poeira-group (toggled boolean)))
