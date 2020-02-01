@@ -107,7 +107,7 @@
 
 (define-subwidget (main-window grains-amp-slider)
     (make-instance 'qtools-elements:slider
-		   :maximum 1.5
+		   :maximum 2.5
 		   :minimum 0.0
 		   :stepping 0.01
 		   :default 1.0
@@ -163,7 +163,7 @@
 
 (define-subwidget (main-window poeira-amp-slider)
     (make-instance 'qtools-elements:slider
-		   :maximum 1.5
+		   :maximum 2.5
 		   :minimum 0.0
 		   :stepping 0.01
 		   :default 1.0

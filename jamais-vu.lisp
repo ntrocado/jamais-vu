@@ -6,6 +6,7 @@
 (defconstant +rec-done+ 0)
 (defconstant +onset+ 1)
 (defconstant +play-done+ 2)
+(defconstant +peak+ 3)
 
 (defparameter *server-sample-rate* 44100
   "The sample rate of the audio server.")
@@ -105,7 +106,11 @@
     :documentation "A buffer object, representing audio in the server.")
    (sub-bufs
     :accessor sub-bufs
-    :documentation "A list of buffers, resulting from the partitioning of the main buffer."))
+    :documentation "A list of buffers, resulting from the partitioning of the main buffer.")
+   (peak
+    :accessor peak
+    :initform 0
+    :documentation "Peak amplitude of the recorded signal."))
   (:documentation "A self-contained abstraction for the recording and playing of an audio sample, stored in the server. Despite the name, it may actually loop or not."))
 
 (defmethod initialize-instance :after ((new-looper looper) &key)
@@ -153,6 +158,7 @@
 (defsynth record-buf ((in 0) bufn (run 1) (stop 0) (loop 0))
   (let* ((sound-in (sound-in.ar in))
 	 (rec (record-buf.ar sound-in bufn :run run :loop loop :act :free))
+	 (peak (peak.ar sound-in 1))
 	 (timer-stop (timer.kr stop))
 	 (timer-done (timer.kr (done.kr rec)))
 	 (onset-detected (coyote.kr sound-in))
@@ -160,6 +166,8 @@
     (send-trig.kr onset-detected 1 onset-timing)
     (send-trig.kr stop 0 timer-stop)
     (send-trig.kr (done.kr rec) 0 timer-done)
+    (send-trig.kr stop 3 peak)
+    (send-trig.kr (done.kr rec) 3 peak)
     (free-self.kr stop)))
 
 (defsynth play-buf ((out 0) bufn dur (window 0.1) (rate 1.0) (start-pos 0.0)
@@ -276,6 +284,14 @@
 	    (nodes (player-nodes looper)))
        (setf (player-nodes looper) (remove (find node nodes :key #'sc::id)
 					   nodes))))
+
+    ;; Peak
+    (#.+peak+
+     (let ((looper (find-recording-looper-by-node-id node)))
+       (setf (peak looper) value)
+       (format t "~&Peak: ~a~%" value))
+     ;; (setf (peak (find-playing-looper-by-node-id node)) value)
+     )
 
     (otherwise
      (format t "~&Unable to handle OSC message with node ~a, id ~a, and value ~a.~%"
@@ -497,7 +513,8 @@
     (let* ((sine-buffer (buffer-alloc (* (alexandria:random-elt '(1 2 3 4))
 					 5512.5))))
       (wavetable sine-buffer :sine2 (let ((root (midicps (+ 24 (random 24)))))
-				      (loop :for i :from 1 :upto 11 :append (list (* i root) (random 0.5))))
+				      (loop :for i :from 1 :upto 11
+					    :append (list (* i root) (/ (peak looper) 11))))
 			     :normalize nil
 			     :as-wavetable nil)
       (buffer-copy (bufnum sine-buffer) (bufnum buffer) (random (- (frames buffer)
