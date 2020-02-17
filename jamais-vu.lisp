@@ -358,7 +358,7 @@
 (defun start-playing-random-start (&key
 				     (looper (default-looper))
 				     (dur 0.5))
-  "Starts playback on LOOPER for DUR seconds, from a random starting point."
+  "Starts playback on LOOPER for DUR seconds, from onset points or, if they are not defined, from a random starting point."
   (with-accessors ((absolute-onset-timings absolute-onset-timings)
 		   (buffer buffer))
       looper
