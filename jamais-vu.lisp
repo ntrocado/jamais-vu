@@ -14,7 +14,7 @@
   "Default buffer duration in seconds.")
 (defparameter *default-number-of-sub-bufs* 8
   "Default number of sub-buffers.")
-(defparameter *default-input* 1
+(defparameter *default-input* 4
   "Default recording input in the audio interface.")
 
 ;; Uncomment and eval to control synths with the mouse.
@@ -33,7 +33,9 @@
 (defun server-start ()
   "Defines a SuperCollider server and boots it."
   (setf *s* (make-external-server "localhost"
-				  :server-options (make-server-options :block-size 16
+				  :server-options (make-server-options :num-input-bus 8
+								       :num-output-bus 10
+								       :block-size 16
 								       :hardware-samplerate 44100
 								       :device "ASIO : ASIO Fireface")
 				  :port 4444))
