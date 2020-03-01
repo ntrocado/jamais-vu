@@ -253,12 +253,12 @@
     (find node-id *loopers* :key #'play-node-id :test #'find)))
 
 (defun osc-responder (node id value &optional (qobject nil))
-  (case id
-    ;; Recording stopped
-    (#.+rec-done+
-     (when qobject (cl+qt:signal! qobject (jamais-vu.gui::rec-stop jamais-vu.gui::float) value))
-     (format t "~&Rec stop. Dur: ~a~%" value)
-     (let ((looper (find-recording-looper-by-node-id node)))
+  (let ((looper (find-recording-looper-by-node-id node)))
+    (case id
+      ;; Recording stopped
+      (#.+rec-done+
+       (when qobject (cl+qt:signal! qobject (jamais-vu.gui::rec-stop jamais-vu.gui::float) value))
+       (format t "~&Rec stop. Dur: ~a~%" value)
        (with-accessors ((buffer buffer) (dur dur) (loop-start loop-start)
 			(absolute-onset-timings absolute-onset-timings)
 			(inter-onset-timings inter-onset-timings)
@@ -273,32 +273,31 @@
 				       (reverse inter-onset-timings))
 	       inter-onset-timings '()
 	       dur value
-	       recording-p nil))))
+	       recording-p nil)))
 
-    ;; Onset detected
-    (#.+onset+
-     (let ((looper (find-recording-looper-by-node-id node)))
+      ;; Onset detected
+      (#.+onset+
        (push value (inter-onset-timings looper))
-       (format t "~&Onset: ~a~%" value)))
+       (format t "~&Onset: ~a~%" value))
 
-    ;; Playing stopped
-    (#.+play-done+
-     (let* ((looper (find-playing-looper-by-node-id node))
-	    (nodes (player-nodes looper)))
-       (setf (player-nodes looper) (remove (find node nodes :key #'sc::id)
-					   nodes))))
+      ;; Playing stopped
+      (#.+play-done+
+       (let ((nodes (player-nodes looper)))
+	 (setf (player-nodes looper) (remove (find node nodes :key #'sc::id)
+					     nodes))))
 
-    ;; Peak
-    (#.+peak+
-     (let ((looper (find-recording-looper-by-node-id node)))
+      ;; Peak
+      (#.+peak+
        (setf (peak looper) value)
        (format t "~&Peak: ~a~%" value))
-     ;; (setf (peak (find-playing-looper-by-node-id node)) value)
-     )
 
-    (otherwise
-     (format t "~&Unable to handle OSC message with node ~a, id ~a, and value ~a.~%"
-	     node id value))))
+      ;; Playhead position
+      (#.+head-pos+
+       (format t "Head pos: ~a~%" value))
+
+      (otherwise
+       (format t "~&Unable to handle OSC message with node ~a, id ~a, and value ~a.~%"
+	       node id value)))))
 
 (add-reply-responder "/tr" #'osc-responder)
 
