@@ -7,6 +7,7 @@
 (defconstant +onset+ 1)
 (defconstant +play-done+ 2)
 (defconstant +peak+ 3)
+(defconstant +head-pos+ 4)
 
 (defparameter *server-sample-rate* 44100
   "The sample rate of the audio server.")
@@ -14,8 +15,9 @@
   "Default buffer duration in seconds.")
 (defparameter *default-number-of-sub-bufs* 8
   "Default number of sub-buffers.")
-(defparameter *default-input* 4
+(defparameter *default-input* 1
   "Default recording input in the audio interface.")
+(defparameter *default-output* 0)
 
 ;; Uncomment and eval to control synths with the mouse.
 ;; Otherwise use CTRL or the GUI
@@ -112,7 +114,11 @@
    (peak
     :accessor peak
     :initform 0
-    :documentation "Peak amplitude of the recorded signal."))
+    :documentation "Peak amplitude of the recorded signal.")
+   (playhead
+    :accessor playhead
+    :initform nil
+    :documentation "Last saved position of the playhead, in samples."))
   (:documentation "A self-contained abstraction for the recording and playing of an audio sample, stored in the server. Despite the name, it may actually loop or not."))
 
 (defmethod initialize-instance :after ((new-looper looper) &key)
@@ -154,12 +160,15 @@
 	(buffer-read-channel path :channels 0
 				  :bufnum (bufnum (buffer looper)))))
 
+(defun update-playhead (value &optional (looper (default-looper)))
+  (setf (playhead looper) value))
+
 
 ;;; Synth definitions
 
-(defsynth record-buf ((in 0) bufn (run 1) (stop 0) (loop 0))
+(defsynth record-buf ((in 0) bufn (offset 0) (run 1) (stop 0) (loop 1))
   (let* ((sound-in (sound-in.ar in))
-	 (rec (record-buf.ar sound-in bufn :run run :loop loop :act :free))
+	 (rec (record-buf.ar sound-in bufn :offset offset :run run :loop loop :act :free))
 	 (peak (peak.ar sound-in 1))
 	 (timer-stop (timer.kr stop))
 	 (timer-done (timer.kr (done.kr rec)))
@@ -173,12 +182,14 @@
     (free-self.kr stop)))
 
 (defsynth play-buf ((out 0) bufn dur (window 0.1) (rate 1.0) (start-pos 0.0)
-		    (amp 1.0) (gate 1))
-  (let ((sound (play-buf.ar 1 bufn rate :start-pos start-pos :loop 1))
-	(envelope (env-gen.kr (env '(0 1 1 0)
-				   (list (/ window 2) (- dur window) (/ window 2))
-				   '(:lin :hold :lin)) :act :free))
-	(cutoff (env-gen.kr (cutoff 0.1) :gate gate :act :free)))
+		    (amp 1.0) (gate 1) (get-head-pos 0))
+  (let* ((playhead (phasor.ar 1 (* rate (buf-rate-scale.ir bufn)) start-pos (buf-frames.kr bufn)))
+	 (sound (buf-rd.ar 1 bufn playhead))
+	 (envelope (env-gen.kr (env '(0 1 1 0)
+				    (list (/ window 2) (- dur window) (/ window 2))
+				    '(:lin :hold :lin)) :act :free))
+	 (cutoff (env-gen.kr (cutoff 0.1) :gate gate :act :free)))
+    (send-trig.kr get-head-pos +head-pos+ playhead)
     (send-trig.kr (done.kr envelope) +play-done+)
     (send-trig.kr (done.kr cutoff) +play-done+)
     (out.ar out (pan2.ar (* sound envelope cutoff amp)))))
@@ -252,18 +263,19 @@
     (find node-id *loopers* :key #'play-node-id :test #'find)))
 
 (defun osc-responder (node id value &optional (qobject nil))
-  (case id
-    ;; Recording stopped
-    (#.+rec-done+
-     (when qobject (cl+qt:signal! qobject (jamais-vu.gui::rec-stop jamais-vu.gui::float) value))
-     (format t "~&Rec stop. Dur: ~a~%" value)
-     (let ((looper (find-recording-looper-by-node-id node)))
+  (let ((looper (or (find-recording-looper-by-node-id node)
+		    (find-playing-looper-by-node-id node))))
+    (case id
+      ;; Recording stopped
+      (#.+rec-done+
+       (when qobject (cl+qt:signal! qobject (jamais-vu.gui::rec-stop jamais-vu.gui::float) value))
+       (format t "~&Rec stop. Dur: ~a~%" value)
        (with-accessors ((buffer buffer) (dur dur) (loop-start loop-start)
 			(absolute-onset-timings absolute-onset-timings)
 			(inter-onset-timings inter-onset-timings)
 			(recording-p recording-p))
 	   looper
-	 (setf (frames buffer) (- (truncate (* (max value dur)
+	 (setf (frames buffer) (- (truncate (* dur ;(min value dur)
 					       *server-sample-rate*))
 				  32 ; TODO check why; block size?
 				  )
@@ -271,48 +283,53 @@
 	       absolute-onset-timings (inter-onset->absolute
 				       (reverse inter-onset-timings))
 	       inter-onset-timings '()
-	       dur value
-	       recording-p nil))))
+	       ;dur value
+	       recording-p nil)))
 
-    ;; Onset detected
-    (#.+onset+
-     (let ((looper (find-recording-looper-by-node-id node)))
+      ;; Onset detected
+      (#.+onset+
        (push value (inter-onset-timings looper))
-       (format t "~&Onset: ~a~%" value)))
+       (format t "~&Onset: ~a~%" value))
 
-    ;; Playing stopped
-    (#.+play-done+
-     (let* ((looper (find-playing-looper-by-node-id node))
-	    (nodes (player-nodes looper)))
-       (setf (player-nodes looper) (remove (find node nodes :key #'sc::id)
-					   nodes))))
+      ;; Playing stopped
+      (#.+play-done+
+       (let ((nodes (player-nodes looper)))
+	 (setf (player-nodes looper) (remove (find node nodes :key #'sc::id)
+					     nodes))))
 
-    ;; Peak
-    (#.+peak+
-     (let ((looper (find-recording-looper-by-node-id node)))
+      ;; Peak
+      (#.+peak+
        (setf (peak looper) value)
        (format t "~&Peak: ~a~%" value))
-     ;; (setf (peak (find-playing-looper-by-node-id node)) value)
-     )
 
-    (otherwise
-     (format t "~&Unable to handle OSC message with node ~a, id ~a, and value ~a.~%"
-	     node id value))))
+      ;; Playhead position
+      (#.+head-pos+
+       (update-playhead value looper)
+       (format t "Head pos: ~a~%" value))
+
+      (otherwise
+       (format t "~&Unable to handle OSC message with node ~a, id ~a, and value ~a.~%"
+	       node id value)))))
 
 (add-reply-responder "/tr" #'osc-responder)
 
 
 ;;; Recording
 
-(defun start-recording (&key (looper (default-looper)) (in *default-input*) (loop 0))
+(defun start-recording (&key (looper (default-looper)) (in *default-input*) (loop 1))
   (unless (recording-p looper)
+    (when (playing-p looper)
+      (ctrl (first (player-nodes looper)) :get-head-pos 1)
+      (sleep .1)) ;to allow the update of the playhead position
     (setf (absolute-onset-timings looper) nil
 	  (recorder-node looper) (synth 'record-buf
 					:in in
 					:bufn (bufnum (buffer looper))
+					:offset (playhead looper)
 					:run 1
 					:loop loop)
-	  (recording-p looper) t)))
+	  (recording-p looper) t
+	  (playhead looper) nil)))
 
 (defun stop-recording (&key (looper (default-looper)))
   (when (recording-p looper)
@@ -353,13 +370,12 @@
 		      :start-pos start-pos)))
 	;; no more repetitions
 	(progn
-	  (setf (playing-p looper) nil)
+	  (setf (playing-p looper) nil
+		(playhead looper) nil)
 	  (when jamais-vu.gui:*window*
 	    (cl+qt:signal! jamais-vu.gui:*window* (play-finished string) "PLAY"))))))
 
-(defun start-playing-random-start (&key
-				     (looper (default-looper))
-				     (dur 0.5))
+(defun start-playing-random-start (&key (looper (default-looper)) (dur 0.5))
   "Starts playback on LOOPER for DUR seconds, from onset points or, if they are not defined, from a random starting point."
   (with-accessors ((absolute-onset-timings absolute-onset-timings)
 		   (buffer buffer))
@@ -384,7 +400,8 @@
       looper
     (when playing-p
       (mapc (lambda (n) (ctrl n :gate 0)) player-nodes))
-    (setf (playing-p looper) nil)))
+    (setf (playing-p looper) nil
+	  (playhead looper) nil)))
 
 ;;; Clear buffer
 
@@ -471,6 +488,7 @@
 		    (pan (white-noise.kr 0.6)))
 	       (* (tgrains.ar 2 clk buffer 1 position dur pan 0.5)
 		  amp)))
+	   :out-bus *default-output*
 	   :fade 3.0))
   (setf *t-grains-on* t))
 
@@ -493,6 +511,7 @@
 
 (defun start-poeira (&key (looper (default-looper)))
   (setf *poeira-node* (synth 'poeira
+			     :out *default-output*
 			     :bufn (bufnum (buffer looper))
 			     :density 10
 			     :attack 0.04
@@ -515,11 +534,13 @@
       looper
     (let* ((sine-buffer (buffer-alloc (* (alexandria:random-elt '(1 2 3 4))
 					 5512.5))))
-      (wavetable sine-buffer :sine2 (let ((root (midicps (+ 24 (random 24)))))
-				      (loop :for i :from 1 :upto 11
-					    :append (list (* i root) (/ (peak looper) 11))))
-			     :normalize nil
-			     :as-wavetable nil)
+      (buffer-fill sine-buffer :sine (loop :for i :from 1 :upto 11
+				     	   :collect (/ (peak looper) 11))
+			       :frequencies (let ((root (midicps (+ 24 (random 24)))))
+			       		      (loop :for i :from 1 :upto 11
+			       			    :collect (* i root)))
+			       :normalize nil
+			       :as-wavetable nil)
       (buffer-copy (bufnum sine-buffer) (bufnum buffer) (random (- (frames buffer)
 								   (frames sine-buffer)))))))
 
