@@ -458,14 +458,13 @@
 				    (/ prob 2)))) ; when prob==1 the signal is just phase inverted;
 					          ; 0.5 corresponds to the  maximum effect
     (buffer-load-from-list (buffer looper)
-			   (loop :for d :in deltas
+			   (loop :for d :in (push nil deltas)
 				 :for v := (buffer-get old-buffer 0)
 				   :then (let ((sum (+ v d)))
 					   (if (< -1.0 sum 1.0)
 					       sum
 					       (- v d)))
-				 :collect v :into results
-				 :finally (return (push 0.0 results))))))
+				 :collect v))))
 
 
 ;;; T-Grains
