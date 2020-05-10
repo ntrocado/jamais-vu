@@ -436,7 +436,8 @@
 
 (defun buf-random-sign-delta (&key (looper (default-looper)) (prob 0.2))
   "Destructively transforms the audio buffer in LOOPER, so that each pair of frames is replaced by the value of their difference. Furthermore, this number can be randomly inverted, with probability PROB (between 0 and 1)."
-  (let* ((old-buffer (buffer looper))	 (deltas (random-sign-delta (buffer-load-to-list old-buffer)
+  (let* ((old-buffer (buffer looper))
+	 (deltas (random-sign-delta (buffer-load-to-list old-buffer)
 				    (/ prob 2)))) ; when prob==1 the signal is just phase inverted;
 					          ; 0.5 corresponds to the  maximum effect
     (buffer-load-from-list (buffer looper)
