@@ -7,3 +7,5 @@
 ** TODO Mix
 ** TODO Sync with playback
 * TODO Multiple buffers
+* TODO Fix insert sines
+
