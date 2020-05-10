@@ -514,11 +514,13 @@
       looper
     (let* ((sine-buffer (buffer-alloc (* (alexandria:random-elt '(1 2 3 4))
 					 5512.5))))
-      (wavetable sine-buffer :sine2 (let ((root (midicps (+ 24 (random 24)))))
-				      (loop :for i :from 1 :upto 11
-					    :append (list (* i root) (/ (peak looper) 11))))
-			     :normalize nil
-			     :as-wavetable nil)
+      (buffer-fill sine-buffer :sine (loop :for i :from 1 :upto 11
+				     	   :collect (/ (peak looper) 11))
+			       :frequencies (let ((root (midicps (+ 24 (random 24)))))
+			       		      (loop :for i :from 1 :upto 11
+			       			    :collect (* i root)))
+			       :normalize nil
+			       :as-wavetable nil)
       (buffer-copy (bufnum sine-buffer) (bufnum buffer) (random (- (frames buffer)
 								   (frames sine-buffer)))))))
 
