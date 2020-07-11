@@ -206,7 +206,7 @@
 			     :trig trig
 			     :start-pos (ti-rand.kr 0 frames trig)))
 	 (envelope (env-gen.kr (perc attack release) :gate trig)))
-    (out.ar out (* sound envelope amp))))
+    (out.ar out (pan2.ar (* sound envelope amp) (t-rand.kr -1.0 1.0 trig)))))
 
 ;;; https://en.wikibooks.org/wiki/Designing_Sound_in_SuperCollider/Schroeder_reverb
 (defsynth schroeder-reverb ()
