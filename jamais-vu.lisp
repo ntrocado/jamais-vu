@@ -389,8 +389,7 @@
 
 ;;; TODO
 (defun start-looping (&key (looper (default-looper)))
-  (setf (looping-p looper) t)
-  (start-playing :looper looper))
+  (setf (looping-p looper) t))
 
 (defun stop-looping (&key (looper (default-looper)))
   (setf (looping-p looper) nil))

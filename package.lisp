@@ -28,6 +28,7 @@
 	   #:start-playing
 	   #:start-playing-random-start
 	   #:start-looping
+	   #:stop-looping
 	   #:stop-playing
 
 	   #:buf-random-sign-delta

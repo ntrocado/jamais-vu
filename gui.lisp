@@ -231,6 +231,9 @@
 
 (define-slot (main-window loop) ()
   (declare (connected loop-checkbox (state-changed int)))
+  (if (q+:is-checked loop-checkbox)
+      (jamais-vu:start-looping)
+      (jamais-vu:stop-looping))
   (setf (jamais-vu:looping-p (jamais-vu:default-looper)) (q+:is-checked loop-checkbox)))
 
 (define-slot (main-window record) ()
