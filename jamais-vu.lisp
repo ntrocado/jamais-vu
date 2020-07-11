@@ -545,9 +545,10 @@
 ;;; Mag noise
 
 (proxy :mag-noise
-       (let ((window (expt 2 8))) ; change 12 to values between 4 and 16
-	 (out.ar 0 (pan2.ar (ifft.ar (pv-mag-noise (fft (local-buf window)
-							(play-buf.ar 1 (buffer (default-looper)) 6.0 :loop 1))))))))
+       (let ((window1 (expt 2 11))
+	     (window2 (expt 2 12))) ; change 12 to values between 4 and 16
+	 (ifft.ar (pv-mag-noise (fft (local-buf (list window1 window2))
+				     (play-buf.ar 1 (buffer (default-looper)) 1.0 :loop 1))))))
 
 ;;; Sub-buffers
 
