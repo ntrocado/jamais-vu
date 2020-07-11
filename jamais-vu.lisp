@@ -542,6 +542,13 @@
       (buffer-copy (bufnum sine-buffer) (bufnum buffer) (random (- (frames buffer)
 								   (frames sine-buffer)))))))
 
+;;; Mag noise
+
+(proxy :mag-noise
+       (let ((window (expt 2 8))) ; change 12 to values between 4 and 16
+	 (out.ar 0 (pan2.ar (ifft.ar (pv-mag-noise (fft (local-buf window)
+							(play-buf.ar 1 (buffer (default-looper)) 6.0 :loop 1))))))))
+
 ;;; Sub-buffers
 
 ;;; TODO refactor with the looper classs
