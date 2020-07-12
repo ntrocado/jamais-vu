@@ -532,15 +532,21 @@
       looper
     (let* ((sine-buffer (buffer-alloc (* (alexandria:random-elt '(1 2 3 4))
 					 5512.5))))
-      (buffer-fill sine-buffer :sine (loop :for i :from 1 :upto 11
-				     	   :collect (/ (peak looper) 11))
+      (buffer-fill sine-buffer :sine (make-list 11 :initial-element 0.08)
 			       :frequencies (let ((root (midicps (+ 24 (random 24)))))
 			       		      (loop :for i :from 1 :upto 11
 			       			    :collect (* i root)))
 			       :normalize nil
 			       :as-wavetable nil)
-      (buffer-copy (bufnum sine-buffer) (bufnum buffer) (random (- (frames buffer)
-								   (frames sine-buffer)))))))
+      (buffer-normalize sine-buffer
+			:new-max (max (/ (peak looper) 4)
+				      .25)
+			:complete-handler (lambda (a)
+					    (declare (ignore a))
+					    (buffer-copy (bufnum sine-buffer)
+							 (bufnum buffer)
+							 (random (- (frames buffer)
+								    (frames sine-buffer)))))))))
 
 ;;; Mag noise
 
@@ -549,6 +555,7 @@
 	     (window2 (expt 2 12))) ; change 12 to values between 4 and 16
 	 (ifft.ar (pv-mag-noise (fft (local-buf (list window1 window2))
 				     (play-buf.ar 1 (buffer (default-looper)) 1.0 :loop 1))))))
+(free :mag-noise)
 
 ;;; Sub-buffers
 
