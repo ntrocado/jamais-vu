@@ -197,41 +197,24 @@
 (defsynth poeira ((out 0)
 		  bufn
 		  (density 5)
-		  (attack 0.01)
-		  (release 0.01)
+		  (release 0.005)
 		  (amp 1.0))
-  (let* ((frames (/ (buf-frames.kr bufn) 3))
+  (let* ((frames (buf-frames.kr bufn))
 	 (trig (trig-1.ar (lf-noise0.ar density) 0.01))
 	 (sound (play-buf.ar 1 bufn 1.0
 			     :trig trig
-			     :start-pos (ti-rand.kr 0 frames trig)))
-	 (envelope (env-gen.kr (perc attack release) :gate trig)))
+			     :start-pos (ti-rand.kr 0 frames trig)
+			     :loop 1))
+	 (attack (+ (* (/ (- density 2)
+			  38)
+		       -0.09)
+		    0.1))
+	 (envelope (env-gen.kr (perc attack release)
+			       :gate trig)))
     (out.ar out (pan2.ar (* sound envelope amp) (t-rand.kr -1.0 1.0 trig)))))
 
-;;; https://en.wikibooks.org/wiki/Designing_Sound_in_SuperCollider/Schroeder_reverb
-(defsynth schroeder-reverb ()
-  (let* ((input (in.ar)
-	   ;; (dust2.ar 2 0.1)
-	   )
-	 (delrd (local-in.ar 4))
-	 (output (+ input (subseq delrd 0 2)))
-	 (sig (list (+ (first output) (second output))
-		    (- (first output) (second output))
-		    (+ (third delrd) (fourth delrd))
-		    (- (third delrd) (fourth delrd))))
-	 (sig (list (+ (first sig) (third sig))
-		    (+ (second sig) (fourth sig))
-		    (- (first sig) (third sig))
-		    (- (second sig) (fourth sig))))
-	 (sig (* sig '(0.4 0.37 0.333 0.3)))
-	 (deltimes (- (mapcar (lambda (x) (* x 0.001))
-			      '(101 143 165 177))
-		      (control-dur.ir))))
-    (local-out.ar (delay-c.ar sig deltimes deltimes))
-    (out.ar '(0 1) output)))
 
-
-;;; Global volume
+;; Global volume
 
 ;; TODO This only controls the mix for the live signal
 (proxy :volume

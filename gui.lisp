@@ -175,17 +175,12 @@
 	(q+:checked poeira-group) nil)
   (let ((poeira-layout (q+:make-qvboxlayout)))
     (q+:add-widget poeira-layout poeira-density-slider)
-    (q+:add-widget poeira-layout poeira-fade-slider)
     (q+:add-widget poeira-layout poeira-amp-slider)
     (setf (q+:layout poeira-group) poeira-layout)))
 
 (define-slot (main-window poeira-density-slider) ((value double))
       (declare (connected poeira-density-slider (value-changed double)))
   (sc:ctrl jamais-vu::*poeira-node* :density value))
-
-(define-slot (main-window poeira-fade-slider) ((value double))
-      (declare (connected poeira-fade-slider (value-changed double)))
-  (sc:ctrl jamais-vu::*poeira-node* :attack value))
 
 (define-slot (main-window poeira-amp-slider) ((value double))
       (declare (connected poeira-amp-slider (value-changed double)))
