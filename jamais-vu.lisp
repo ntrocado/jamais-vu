@@ -231,10 +231,18 @@
 
 ;;; OSC message responder
 
-(defun inter-onset->absolute (iot)
-  (loop :for v :in iot
+(defun inter-onset->absolute (iot &optional (dur *default-buffer-duration*))
+  (loop :with results
+	:for v :in iot
 	:sum v :into s
-	:collect s))
+	:do (setf results (delete-if (lambda (x)
+				       (destructuring-bind (time pass)
+					   x
+					 (and (< time (mod s dur))
+					      (< pass (truncate s dur)))))
+				     results))
+	:do (push (list (mod s dur) (truncate s dur)) results)
+	:finally (return (mapcar #'first results))))
 
 (defun find-recording-looper-by-node-id (node-id)
   "Given the id value of a recording node on the server, return the looper object that is using that node."
@@ -267,7 +275,8 @@
 				  )
 	       loop-start (* (mod value dur) *server-sample-rate*)
 	       absolute-onset-timings (inter-onset->absolute
-				       (reverse inter-onset-timings))
+				       (reverse inter-onset-timings)
+				       (dur looper))
 	       inter-onset-timings '()
 	       ;dur value
 	       recording-p nil)))
