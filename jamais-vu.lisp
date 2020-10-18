@@ -181,9 +181,12 @@
     (send-trig.kr (done.kr rec) 3 peak)
     (free-self.kr stop)))
 
-(defsynth play-buf ((out 0) bufn dur (window 0.1) (rate 1.0) (start-pos 0.0)
+(defsynth play-buf ((out 0) bufn dur (window 0.05) (rate 1.0) (start-pos 0.0)
 		    (amp 1.0) (gate 1) (get-head-pos 0))
-  (let* ((playhead (phasor.ar 1 (* rate (buf-rate-scale.ir bufn)) start-pos (buf-frames.kr bufn)))
+  (let* ((playhead (phasor.ar 1
+			      (* rate (buf-rate-scale.ir bufn))
+			      start-pos
+			      (buf-frames.kr bufn)))
 	 (sound (buf-rd.ar 1 bufn playhead))
 	 (envelope (env-gen.kr (env '(0 1 1 0)
 				    (list (/ window 2) (- dur window) (/ window 2))
@@ -330,12 +333,13 @@
 (defun start-playing (&key
 			(looper (default-looper))
 			(time (now)) (dur (dur looper))
-			(n 1) (offset 0)
+			(n 1) (offset .005)
 			(start-pos 0;(loop-start looper)
 			 ))
   (with-accessors ((buffer buffer) (looper-dur dur))
       looper
-    (if (or (plusp n) (looping-p looper))
+    (if (or (plusp n) (and (looping-p looper)
+			   (playing-p looper)))
 	(let ((dur (min dur (buffer-dur buffer))))
 	  (setf (playing-p looper) t)
 	  (at time (push (synth 'play-buf :bufn (bufnum buffer)
@@ -446,7 +450,7 @@
 					   (if (< -1.0 sum 1.0)
 					       sum
 					       (- v d)))
-				 :collect v))))
+ 				 :collect v))))
 
 
 ;;; T-Grains
